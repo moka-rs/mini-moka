@@ -8,8 +8,8 @@
 [![license][license-badge]](#license)
 <!-- [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fmoka-rs%2Fmini-moka.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fmoka-rs%2Fmini-moka?ref=badge_shield) -->
 
-Mini Moka is a fast, concurrent cache library for Rust. Mini Moka is inspired by the
-[Caffeine][caffeine-git] library for Java.
+Mini Moka is a fast, concurrent cache library for Rust. Mini Moka is a light edition
+of [Moka][moka-git].
 
 Mini Moka provides cache implementations on top of hash maps. They support full
 concurrency of retrievals and a high expected concurrency for updates. Mini Moka also
@@ -33,6 +33,7 @@ algorithm to determine which entries to evict when the capacity is exceeded.
 <!-- [coveralls]: https://coveralls.io/github/moka-rs/mini-moka?branch=master -->
 <!-- [fossa]: https://app.fossa.com/projects/git%2Bgithub.com%2Fmoka-rs%2Fmini-moka?ref=badge_shield -->
 
+[moka-git]: https://github.com/moka-rs/moka
 [caffeine-git]: https://github.com/ben-manes/caffeine
 
 
@@ -81,12 +82,7 @@ to take a look at the [Quick Cache][quick-cache] crate.
     - [Expiration Policies](#example-expiration-policies)
 - [Hashing Algorithm](#hashing-algorithm)
 - [Minimum Supported Rust Versions](#minimum-supported-rust-versions)
-- Troubleshooting
-    - [Integer Overflow in Quanta Crate on Some x86_64 Machines](#integer-overflow-in-quanta-crate-on-some-x86_64-machines)
-    - [Compile Errors on Some 32-bit Platforms](#compile-errors-on-some-32-bit-platforms)
 - [Developing Mini Moka](#developing-mini-moka)
-- [Road Map](#road-map)
-- [About the Name](#about-the-name)
 - [Credits](#credits)
 - [License](#license)
 
@@ -105,8 +101,8 @@ mini_moka = "0.9"
 
 The thread-safe, synchronous caches are defined in the `sync` module.
 
-Cache entries are manually added using `insert` or `get_with` method, and
-are stored in the cache until either evicted or manually invalidated.
+Cache entries are manually added using `insert` method, and are stored in the cache
+until either evicted or manually invalidated.
 
 Here's an example of reading and updating a cache by using multiple threads:
 
@@ -166,22 +162,16 @@ fn main() {
 }
 ```
 
-If you want to atomically initialize and insert a value when the key is not present,
-you might want to check [the document][doc-sync-cache] for other insertion methods
-`get_with` and `try_get_with`.
-
-[doc-sync-cache]: https://docs.rs/mini-moka/*/mini_moka/sync/struct.Cache.html#method.get_with
-
 
 ## Avoiding to clone the value at `get`
 
-For the concurrent caches (`sync` and `future` caches), the return type of `get`
-method is `Option<V>` instead of `Option<&V>`, where `V` is the value type. Every
-time `get` is called for an existing key, it creates a clone of the stored value `V`
-and returns it. This is because the `Cache` allows concurrent updates from threads so
-a value stored in the cache can be dropped or replaced at any time by any other
-thread. `get` cannot return a reference `&V` as it is impossible to guarantee the
-value outlives the reference.
+For the concurrent cache (`sync` cache), the return type of `get` method is
+`Option<V>` instead of `Option<&V>`, where `V` is the value type. Every time `get` is
+called for an existing key, it creates a clone of the stored value `V` and returns
+it. This is because the `Cache` allows concurrent updates from threads so a value
+stored in the cache can be dropped or replaced at any time by any other thread. `get`
+cannot return a reference `&V` as it is impossible to guarantee the value outlives
+the reference.
 
 If you want to store values that will be expensive to clone, wrap them by
 `std::sync::Arc` before storing in a cache. [`Arc`][rustdoc-std-arc] is a thread-safe
@@ -270,30 +260,9 @@ fn main() {
 
 ### A note on expiration policies
 
-The cache builders will panic if configured with either `time_to_live` or `time to idle`
-longer than 1000 years. This is done to protect against overflow when computing key
-expiration.
-
-
-## Hashing Algorithm
-
-By default, a cache uses a hashing algorithm selected to provide resistance against
-HashDoS attacks.
-
-The default hashing algorithm is the one used by `std::collections::HashMap`, which
-is currently SipHash 1-3, though this is subject to change at any point in the
-future.
-
-While its performance is very competitive for medium sized keys, other hashing
-algorithms will outperform it for small keys such as integers as well as large keys
-such as long strings. However those algorithms will typically not protect against
-attacks such as HashDoS.
-
-The hashing algorithm can be replaced on a per-`Cache` basis using the
-`build_with_hasher` method of the `CacheBuilder`. Many alternative algorithms are
-available on crates.io, such as the [aHash][ahash-crate] crate.
-
-[ahash-crate]: https://crates.io/crates/ahash
+The cache builders will panic if configured with either `time_to_live` or `time to
+idle` longer than 1000 years. This is done to protect against overflow when computing
+key expiration.
 
 
 ## Minimum Supported Rust Versions
@@ -303,18 +272,11 @@ Mini Moka's minimum supported Rust versions (MSRV) are the followings:
 | Feature          | MSRV                     |
 |:-----------------|:------------------------:|
 | default features | Rust 1.51.0 (2021-03-25) |
-| `future`         | Rust 1.51.0 (2021-03-25) |
 
 It will keep a rolling MSRV policy of at least 6 months. If only the default features
-are enabled, MSRV will be updated conservatively. When using other features, like
-`future`, MSRV might be updated more frequently, up to the latest stable. In both
-cases, increasing MSRV is _not_ considered a semver-breaking change.
-
-<!--
-- tagptr 0.2.0 requires 1.51.
-- socket2 0.4.0 requires 1.46.
-- quanta requires 1.45.
--->
+are enabled, MSRV will be updated conservatively. When using other features, MSRV
+might be updated more frequently, up to the latest stable. In both cases, increasing
+MSRV is _not_ considered a semver-breaking change.
 
 
 ## Developing Mini Moka

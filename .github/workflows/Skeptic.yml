@@ -46,7 +46,7 @@ jobs:
         env:
           RUSTFLAGS: '--cfg skeptic'
 
-      - name: Run tests (sync, future and dash, without atomic64 and quanta)
+      - name: Run tests (sync feature, without atomic64 and quanta)
         uses: actions-rs/cargo@v1
         with:
           command: test
