@@ -101,21 +101,22 @@ where
     }
 }
 
+#[derive(Default)]
 pub(crate) struct BlockingHousekeeper {
     is_sync_running: AtomicBool,
     // #[cfg(any(feature = "sync", feature = "future"))]
     // sync_after: AtomicInstant,
 }
 
-impl Default for BlockingHousekeeper {
-    fn default() -> Self {
-        Self {
-            is_sync_running: Default::default(),
-            // #[cfg(any(feature = "sync", feature = "future"))]
-            // sync_after: AtomicInstant::new(Self::sync_after(Instant::now())),
-        }
-    }
-}
+// impl Default for BlockingHousekeeper {
+//     fn default() -> Self {
+//         Self {
+//             is_sync_running: Default::default(),
+//             // #[cfg(any(feature = "sync", feature = "future"))]
+//             // sync_after: AtomicInstant::new(Self::sync_after(Instant::now())),
+//         }
+//     }
+// }
 
 impl BlockingHousekeeper {
     // #[cfg(any(feature = "sync", feature = "future"))]
