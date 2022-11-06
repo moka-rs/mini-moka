@@ -26,9 +26,6 @@ pub(crate) mod unsafe_weak_pointer;
 )]
 pub(crate) mod atomic_time;
 
-#[cfg(feature = "unstable-debug-counters")]
-pub(crate) mod debug_counters;
-
 use self::entry_info::EntryInfo;
 
 pub(crate) type Weigher<K, V> = Arc<dyn Fn(&K, &V) -> u32 + Send + Sync + 'static>;
