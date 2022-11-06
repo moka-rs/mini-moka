@@ -1,0 +1,64 @@
+name: Skeptic and Trybuild
+
+on:
+  push:
+    paths-ignore:
+    - '.devcontainer/**'
+    - '.gitpod.yml'
+    - '.vscode/**'
+  schedule:
+    # Run against the last commit on the default branch on Friday at 9pm (UTC?)
+    - cron:  '0 21 * * 5'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust:
+          - stable
+          - beta
+
+    steps:
+      - name: Checkout Moka
+        uses: actions/checkout@v2
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          override: true
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v1
+
+      - name: cargo clean
+        uses: actions-rs/cargo@v1
+        with:
+          command: clean
+
+      - name: Run tests (no features)
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --release
+        env:
+          RUSTFLAGS: '--cfg skeptic'
+
+      - name: Run tests (sync, future and dash, without atomic64 and quanta)
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --release --no-default-features --features 'sync'
+        env:
+          RUSTFLAGS: '--cfg skeptic'
+
+      - name: Run compile error tests (sync feature, trybuild)
+        uses: actions-rs/cargo@v1
+        if: ${{ matrix.rust == 'stable' }}
+        with:
+          command: test
+          args: ui_trybuild --release --features 'sync'
+        env:
+          RUSTFLAGS: '--cfg trybuild'
