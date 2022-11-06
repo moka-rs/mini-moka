@@ -7,13 +7,13 @@ use super::{
     unsafe_weak_pointer::UnsafeWeakPointer,
 };
 
-// #[cfg(any(feature = "sync", feature = "future"))]
+// #[cfg(feature = "sync")]
 // use super::atomic_time::AtomicInstant;
 
-// #[cfg(any(feature = "sync", feature = "future"))]
+// #[cfg(feature = "sync")]
 // use crate::common::time::{CheckedTimeOps, Instant};
 
-// #[cfg(any(feature = "sync", feature = "future"))]
+// #[cfg(feature = "sync")]
 // use super::constants::{READ_LOG_FLUSH_POINT, WRITE_LOG_FLUSH_POINT};
 
 use parking_lot::Mutex;
@@ -30,7 +30,7 @@ use std::{
 pub(crate) trait InnerSync {
     fn sync(&self, max_sync_repeats: usize) -> Option<SyncPace>;
 
-    // #[cfg(any(feature = "sync", feature = "future"))]
+    // #[cfg(feature = "sync")]
     // fn now(&self) -> Instant;
 }
 
@@ -69,7 +69,7 @@ where
         }
     }
 
-    // #[cfg(any(feature = "sync", feature = "future"))]
+    // #[cfg(feature = "sync")]
     // pub(crate) fn should_apply_reads(&self, ch_len: usize, now: Instant) -> bool {
     //     match self {
     //         Housekeeper::Blocking(h) => h.should_apply_reads(ch_len, now),
@@ -77,7 +77,7 @@ where
     //     }
     // }
 
-    // #[cfg(any(feature = "sync", feature = "future"))]
+    // #[cfg(feature = "sync")]
     // pub(crate) fn should_apply_writes(&self, ch_len: usize, now: Instant) -> bool {
     //     match self {
     //         Housekeeper::Blocking(h) => h.should_apply_writes(ch_len, now),
@@ -104,7 +104,7 @@ where
 #[derive(Default)]
 pub(crate) struct BlockingHousekeeper {
     is_sync_running: AtomicBool,
-    // #[cfg(any(feature = "sync", feature = "future"))]
+    // #[cfg(feature = "sync")]
     // sync_after: AtomicInstant,
 }
 
@@ -112,24 +112,24 @@ pub(crate) struct BlockingHousekeeper {
 //     fn default() -> Self {
 //         Self {
 //             is_sync_running: Default::default(),
-//             // #[cfg(any(feature = "sync", feature = "future"))]
+//             // #[cfg(feature = "sync")]
 //             // sync_after: AtomicInstant::new(Self::sync_after(Instant::now())),
 //         }
 //     }
 // }
 
 impl BlockingHousekeeper {
-    // #[cfg(any(feature = "sync", feature = "future"))]
+    // #[cfg(feature = "sync")]
     // fn should_apply_reads(&self, ch_len: usize, now: Instant) -> bool {
     //     self.should_apply(ch_len, READ_LOG_FLUSH_POINT / 8, now)
     // }
 
-    // #[cfg(any(feature = "sync", feature = "future"))]
+    // #[cfg(feature = "sync")]
     // fn should_apply_writes(&self, ch_len: usize, now: Instant) -> bool {
     //     self.should_apply(ch_len, WRITE_LOG_FLUSH_POINT / 8, now)
     // }
 
-    // #[cfg(any(feature = "sync", feature = "future"))]
+    // #[cfg(feature = "sync")]
     // #[inline]
     // fn should_apply(&self, ch_len: usize, ch_flush_point: usize, now: Instant) -> bool {
     //     ch_len >= ch_flush_point || self.sync_after.instant().unwrap() >= now
@@ -144,7 +144,7 @@ impl BlockingHousekeeper {
             Ordering::Relaxed,
         ) {
             Ok(_) => {
-                // #[cfg(any(feature = "sync", feature = "future"))]
+                // #[cfg(feature = "sync")]
                 // {
                 //     let now = cache.now();
                 //     self.sync_after.set_instant(Self::sync_after(now));
@@ -159,7 +159,7 @@ impl BlockingHousekeeper {
         }
     }
 
-    // #[cfg(any(feature = "sync", feature = "future"))]
+    // #[cfg(feature = "sync")]
     // fn sync_after(now: Instant) -> Instant {
     //     let dur = Duration::from_millis(PERIODICAL_SYNC_INITIAL_DELAY_MILLIS);
     //     let ts = now.checked_add(dur);
@@ -290,12 +290,12 @@ where
             .execute_with_dynamic_delay(initial_delay, housekeeper_closure)
     }
 
-    // #[cfg(any(feature = "sync", feature = "future"))]
+    // #[cfg(feature = "sync")]
     // fn should_apply_reads(&self, ch_len: usize, _now: Instant) -> bool {
     //     ch_len >= READ_LOG_FLUSH_POINT
     // }
 
-    // #[cfg(any(feature = "sync", feature = "future"))]
+    // #[cfg(feature = "sync")]
     // fn should_apply_writes(&self, ch_len: usize, _now: Instant) -> bool {
     //     ch_len >= WRITE_LOG_FLUSH_POINT
     // }
