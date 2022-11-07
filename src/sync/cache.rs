@@ -1,10 +1,13 @@
 use super::{base_cache::BaseCache, CacheBuilder, ConcurrentCacheExt, EntryRef, Iter};
 use crate::{
-    common::{concurrent::{
-        constants::{MAX_SYNC_REPEATS, WRITE_RETRY_INTERVAL_MICROS},
-        housekeeper::{InnerSync, Housekeeper},
-        Weigher, WriteOp,
-    }, time::Instant},
+    common::{
+        concurrent::{
+            constants::{MAX_SYNC_REPEATS, WRITE_RETRY_INTERVAL_MICROS},
+            housekeeper::{Housekeeper, InnerSync},
+            Weigher, WriteOp,
+        },
+        time::Instant,
+    },
     Policy,
 };
 
@@ -441,8 +444,14 @@ where
     pub(crate) fn insert_with_hash(&self, key: Arc<K>, hash: u64, value: V) {
         let (op, now) = self.base.do_insert_with_hash(key, hash, value);
         let hk = self.base.housekeeper.as_ref();
-        Self::schedule_write_op(self.base.inner.as_ref(), &self.base.write_op_ch, op, now, hk)
-            .expect("Failed to insert");
+        Self::schedule_write_op(
+            self.base.inner.as_ref(),
+            &self.base.write_op_ch,
+            op,
+            now,
+            hk,
+        )
+        .expect("Failed to insert");
     }
 
     /// Discards any cached value for the key.
@@ -458,8 +467,14 @@ where
             let op = WriteOp::Remove(kv);
             let now = self.base.current_time_from_expiration_clock();
             let hk = self.base.housekeeper.as_ref();
-            Self::schedule_write_op(self.base.inner.as_ref(), &self.base.write_op_ch, op, now, hk)
-                .expect("Failed to remove");
+            Self::schedule_write_op(
+                self.base.inner.as_ref(),
+                &self.base.write_op_ch,
+                op,
+                now,
+                hk,
+            )
+            .expect("Failed to remove");
         }
     }
 
