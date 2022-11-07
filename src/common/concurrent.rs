@@ -9,8 +9,6 @@ pub(crate) mod constants;
 pub(crate) mod deques;
 pub(crate) mod entry_info;
 pub(crate) mod housekeeper;
-pub(crate) mod thread_pool;
-pub(crate) mod unsafe_weak_pointer;
 
 // target_has_atomic is more convenient but yet unstable (Rust 1.55)
 // https://github.com/rust-lang/rust/issues/32976

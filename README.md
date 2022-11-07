@@ -80,7 +80,6 @@ to take a look at the [Quick Cache][quick-cache] crate.
 - Examples (Part 2)
     - [Size Aware Eviction](#example-size-aware-eviction)
     - [Expiration Policies](#example-expiration-policies)
-- [Hashing Algorithm](#hashing-algorithm)
 - [Minimum Supported Rust Versions](#minimum-supported-rust-versions)
 - [Developing Mini Moka](#developing-mini-moka)
 - [Credits](#credits)

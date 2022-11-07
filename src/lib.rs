@@ -4,8 +4,8 @@
 // #![deny(rustdoc::broken_intra_doc_links)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-//! Mini Moka is a fast, concurrent cache library for Rust. Moka is inspired by
-//! the [Caffeine][caffeine-git] library for Java.
+//! Mini Moka is a fast, concurrent cache library for Rust. Mini Moka is a light
+//! edition of [Moka][moka-git].
 //!
 //! Mini Moka provides an in-memory concurrent cache implementation on top of hash
 //! map. It supports high expected concurrency of retrievals and updates.
@@ -17,6 +17,7 @@
 //! entry replacement algorithm to determine which entries to evict when the capacity
 //! is exceeded.
 //!
+//! [moka-git]: https://github.com/moka-rs/moka
 //! [caffeine-git]: https://github.com/ben-manes/caffeine
 //!
 //! # Features

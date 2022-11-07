@@ -1,13 +1,10 @@
-use super::{
-    base_cache::{BaseCache, HouseKeeperArc},
-    CacheBuilder, ConcurrentCacheExt, EntryRef, Iter,
-};
+use super::{base_cache::BaseCache, CacheBuilder, ConcurrentCacheExt, EntryRef, Iter};
 use crate::{
-    common::concurrent::{
+    common::{concurrent::{
         constants::{MAX_SYNC_REPEATS, WRITE_RETRY_INTERVAL_MICROS},
-        housekeeper::InnerSync,
+        housekeeper::{InnerSync, Housekeeper},
         Weigher, WriteOp,
-    },
+    }, time::Instant},
     Policy,
 };
 
@@ -442,9 +439,9 @@ where
     }
 
     pub(crate) fn insert_with_hash(&self, key: Arc<K>, hash: u64, value: V) {
-        let op = self.base.do_insert_with_hash(key, hash, value);
+        let (op, now) = self.base.do_insert_with_hash(key, hash, value);
         let hk = self.base.housekeeper.as_ref();
-        Self::schedule_write_op(self.base.inner.as_ref(), &self.base.write_op_ch, op, hk)
+        Self::schedule_write_op(self.base.inner.as_ref(), &self.base.write_op_ch, op, now, hk)
             .expect("Failed to insert");
     }
 
@@ -459,8 +456,9 @@ where
     {
         if let Some(kv) = self.base.remove_entry(key) {
             let op = WriteOp::Remove(kv);
+            let now = self.base.current_time_from_expiration_clock();
             let hk = self.base.housekeeper.as_ref();
-            Self::schedule_write_op(self.base.inner.as_ref(), &self.base.write_op_ch, op, hk)
+            Self::schedule_write_op(self.base.inner.as_ref(), &self.base.write_op_ch, op, now, hk)
                 .expect("Failed to remove");
         }
     }
@@ -562,7 +560,8 @@ where
         inner: &impl InnerSync,
         ch: &Sender<WriteOp<K, V>>,
         op: WriteOp<K, V>,
-        housekeeper: Option<&HouseKeeperArc<K, V, S>>,
+        now: Instant,
+        housekeeper: Option<&Arc<Housekeeper>>,
     ) -> Result<(), TrySendError<WriteOp<K, V>>> {
         let mut op = op;
 
@@ -571,7 +570,7 @@ where
         // - We are doing a busy-loop here. We were originally calling `ch.send(op)?`,
         //   but we got a notable performance degradation.
         loop {
-            BaseCache::apply_reads_writes_if_needed(inner, ch, housekeeper);
+            BaseCache::<K, V, S>::apply_reads_writes_if_needed(inner, ch, now, housekeeper);
             match ch.try_send(op) {
                 Ok(()) => break,
                 Err(TrySendError::Full(op1)) => {
