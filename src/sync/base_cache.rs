@@ -5,12 +5,11 @@ use crate::{
         concurrent::{
             atomic_time::AtomicInstant,
             constants::{
-                READ_LOG_FLUSH_POINT, READ_LOG_SIZE, WRITE_LOG_FLUSH_POINT,
-                WRITE_LOG_LOW_WATER_MARK, WRITE_LOG_SIZE,
+                READ_LOG_FLUSH_POINT, READ_LOG_SIZE, WRITE_LOG_FLUSH_POINT, WRITE_LOG_SIZE,
             },
             deques::Deques,
             entry_info::EntryInfo,
-            housekeeper::{self, Housekeeper, InnerSync, SyncPace},
+            housekeeper::{Housekeeper, InnerSync},
             AccessTime, KeyDate, KeyHash, KeyHashDate, KvEntry, ReadOp, ValueEntry, Weigher,
             WriteOp,
         },
@@ -40,13 +39,11 @@ use std::{
 };
 use triomphe::Arc as TrioArc;
 
-pub(crate) type HouseKeeperArc<K, V, S> = Arc<Housekeeper<Inner<K, V, S>>>;
-
 pub(crate) struct BaseCache<K, V, S = RandomState> {
     pub(crate) inner: Arc<Inner<K, V, S>>,
     read_op_ch: Sender<ReadOp<K, V>>,
     pub(crate) write_op_ch: Sender<WriteOp<K, V>>,
-    pub(crate) housekeeper: Option<HouseKeeperArc<K, V, S>>,
+    pub(crate) housekeeper: Option<Arc<Housekeeper>>,
 }
 
 impl<K, V, S> Clone for BaseCache<K, V, S> {
@@ -111,8 +108,7 @@ where
             time_to_live,
             time_to_idle,
         ));
-        let h_cfg = housekeeper::Configuration::new_thread_pool(true);
-        let housekeeper = Housekeeper::new(Arc::downgrade(&inner), h_cfg);
+        let housekeeper = Housekeeper::default();
         Self {
             inner,
             read_op_ch: r_snd,
@@ -154,19 +150,20 @@ where
         Arc<K>: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
-        let record = |op| {
-            self.record_read_op(op).expect("Failed to record a get op");
+        let record = |op, now| {
+            self.record_read_op(op, now)
+                .expect("Failed to record a get op");
         };
+        let now = self.inner.current_time_from_expiration_clock();
 
         match self.inner.get(key) {
             None => {
-                record(ReadOp::Miss(hash));
+                record(ReadOp::Miss(hash), now);
                 None
             }
             Some(entry) => {
                 let i = &self.inner;
                 let (ttl, tti, va) = (&i.time_to_live(), &i.time_to_idle(), &i.valid_after());
-                let now = i.current_time_from_expiration_clock();
                 let arc_entry = &*entry;
 
                 if is_expired_entry_wo(ttl, va, arc_entry, now)
@@ -176,7 +173,7 @@ where
                     std::mem::drop(entry);
                     // Expired or invalidated entry. Record this access as a cache miss
                     // rather than a hit.
-                    record(ReadOp::Miss(hash));
+                    record(ReadOp::Miss(hash), now);
                     None
                 } else {
                     // Valid entry.
@@ -184,7 +181,7 @@ where
                     let e = TrioArc::clone(arc_entry);
                     // Drop the entry to avoid to deadlock with record_read_op.
                     std::mem::drop(entry);
-                    record(ReadOp::Hit(hash, e, now));
+                    record(ReadOp::Hit(hash, e, now), now);
                     Some(v)
                 }
             }
@@ -204,13 +201,14 @@ where
     pub(crate) fn apply_reads_writes_if_needed(
         inner: &impl InnerSync,
         ch: &Sender<WriteOp<K, V>>,
-        housekeeper: Option<&HouseKeeperArc<K, V, S>>,
+        now: Instant,
+        housekeeper: Option<&Arc<Housekeeper>>,
     ) {
         let w_len = ch.len();
 
-        if Self::should_apply_writes(w_len) {
-            if let Some(h) = housekeeper {
-                h.try_sync(inner);
+        if let Some(hk) = housekeeper {
+            if hk.should_apply_writes(w_len, now) {
+                hk.try_sync(inner);
             }
         }
     }
@@ -252,8 +250,12 @@ where
     S: BuildHasher + Clone + Send + Sync + 'static,
 {
     #[inline]
-    fn record_read_op(&self, op: ReadOp<K, V>) -> Result<(), TrySendError<ReadOp<K, V>>> {
-        self.apply_reads_if_needed(self.inner.as_ref());
+    fn record_read_op(
+        &self,
+        op: ReadOp<K, V>,
+        now: Instant,
+    ) -> Result<(), TrySendError<ReadOp<K, V>>> {
+        self.apply_reads_if_needed(self.inner.as_ref(), now);
         let ch = &self.read_op_ch;
         match ch.try_send(op) {
             // Discard the ReadOp when the channel is full.
@@ -263,7 +265,12 @@ where
     }
 
     #[inline]
-    pub(crate) fn do_insert_with_hash(&self, key: Arc<K>, hash: u64, value: V) -> WriteOp<K, V> {
+    pub(crate) fn do_insert_with_hash(
+        &self,
+        key: Arc<K>,
+        hash: u64,
+        value: V,
+    ) -> (WriteOp<K, V>, Instant) {
         let ts = self.inner.current_time_from_expiration_clock();
         let weight = self.inner.weigh(&key, &value);
         let mut insert_op = None;
@@ -301,8 +308,8 @@ where
             });
 
         match (insert_op, update_op) {
-            (Some(ins_op), None) => ins_op,
-            (None, Some(upd_op)) => upd_op,
+            (Some(ins_op), None) => (ins_op, ts),
+            (None, Some(upd_op)) => (upd_op, ts),
             _ => unreachable!(),
         }
     }
@@ -337,24 +344,21 @@ where
     }
 
     #[inline]
-    fn apply_reads_if_needed(&self, inner: &impl InnerSync) {
+    fn apply_reads_if_needed(&self, inner: &impl InnerSync, now: Instant) {
         let len = self.read_op_ch.len();
 
-        if Self::should_apply_reads(len) {
-            if let Some(h) = &self.housekeeper {
-                h.try_sync(inner);
+        if let Some(hk) = &self.housekeeper {
+            if hk.should_apply_reads(len, now) {
+                if let Some(h) = &self.housekeeper {
+                    h.try_sync(inner);
+                }
             }
         }
     }
 
     #[inline]
-    fn should_apply_reads(ch_len: usize) -> bool {
-        ch_len >= READ_LOG_FLUSH_POINT
-    }
-
-    #[inline]
-    fn should_apply_writes(ch_len: usize) -> bool {
-        ch_len >= WRITE_LOG_FLUSH_POINT
+    pub(crate) fn current_time_from_expiration_clock(&self) -> Instant {
+        self.inner.current_time_from_expiration_clock()
     }
 }
 
@@ -369,10 +373,6 @@ where
     S: BuildHasher + Clone + Send + Sync + 'static,
 {
     pub(crate) fn reconfigure_for_testing(&mut self) {
-        // Stop the housekeeping job that may cause sync() method to return earlier.
-        if let Some(housekeeper) = &self.housekeeper {
-            housekeeper.stop_periodical_sync_job();
-        }
         // Enable the frequency sketch.
         self.inner.enable_frequency_sketch_for_testing();
     }
@@ -647,7 +647,7 @@ where
     V: Send + Sync + 'static,
     S: BuildHasher + Clone + Send + Sync + 'static,
 {
-    fn sync(&self, max_repeats: usize) -> Option<SyncPace> {
+    fn sync(&self, max_repeats: usize) {
         let mut deqs = self.deques.lock();
         let mut calls = 0;
         let mut should_sync = true;
@@ -695,21 +695,11 @@ where
         debug_assert_eq!(self.weighted_size.load(), current_ws);
         self.entry_count.store(counters.entry_count);
         self.weighted_size.store(counters.weighted_size);
-
-        if should_sync {
-            Some(SyncPace::Fast)
-        } else if self.write_op_ch.len() <= WRITE_LOG_LOW_WATER_MARK {
-            Some(SyncPace::Normal)
-        } else {
-            // Keep the current pace.
-            None
-        }
     }
 
-    // #[cfg(feature = "sync")]
-    // fn now(&self) -> Instant {
-    //     unreachable!()
-    // }
+    fn now(&self) -> Instant {
+        self.current_time_from_expiration_clock()
+    }
 }
 
 //
