@@ -72,13 +72,9 @@ jobs:
         with:
           command: test
           args: --features sync
-        env:
-          RUSTFLAGS: '--cfg rustver'
 
       - name: Run tests (release, sync feature)
         uses: actions-rs/cargo@v1
         with:
           command: test
           args: --release --features sync
-        env:
-          RUSTFLAGS: '--cfg rustver'
