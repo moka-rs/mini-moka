@@ -26,13 +26,9 @@ jobs:
           - target: aarch64-unknown-linux-musl
           - target: i686-unknown-linux-musl
           - target: armv7-unknown-linux-musleabihf
-          # Platforms without AtomicU64 support.
           - target: armv5te-unknown-linux-musleabi
-            cargo-opts: "--no-default-features"  # Disable atomic64 and quanta features.
           - target: mips-unknown-linux-musl
-            cargo-opts: "--no-default-features"  # Disable atomic64 and quanta features.
           - target: mipsel-unknown-linux-musl
-            cargo-opts: "--no-default-features"  # Disable atomic64 and quanta features.
 
     steps:
       - name: Checkout Moka
@@ -50,9 +46,6 @@ jobs:
         run: |
           rm -rf tests
           sed -i '/actix-rt\|async-std\|reqwest\|skeptic/d' Cargo.toml
-          sed -i 's/target.*rustver.*\.//' Cargo.toml
-          sed -i 's/build = "build.rs"/build = ".ci_extras\/build_linux_cross.rs"/' Cargo.toml
-          cat Cargo.toml
 
       - uses: Swatinem/rust-cache@v1
 
@@ -66,6 +59,4 @@ jobs:
         with:
           use-cross: true
           command: test
-          args: --release --features sync --target ${{ matrix.platform.target }} ${{ matrix.platform.cargo-opts }}
-        env:
-          RUSTFLAGS: '--cfg rustver'
+          args: --release --features sync --target ${{ matrix.platform.target }}

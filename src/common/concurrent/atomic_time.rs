@@ -1,6 +1,6 @@
 use super::Instant;
 
-use parking_lot::RwLock;
+use std::sync::RwLock;
 
 pub(crate) struct AtomicInstant {
     instant: RwLock<Option<Instant>>,
@@ -22,14 +22,14 @@ impl AtomicInstant {
     }
 
     pub(crate) fn is_set(&self) -> bool {
-        self.instant.read().is_some()
+        self.instant.read().expect("lock poisoned").is_some()
     }
 
     pub(crate) fn instant(&self) -> Option<Instant> {
-        *self.instant.read()
+        *self.instant.read().expect("lock poisoned")
     }
 
     pub(crate) fn set_instant(&self, instant: Instant) {
-        *self.instant.write() = Some(instant);
+        *self.instant.write().expect("lock poisoned") = Some(instant);
     }
 }

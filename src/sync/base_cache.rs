@@ -24,7 +24,6 @@ use crate::{
 use crossbeam_channel::{Receiver, Sender, TrySendError};
 use crossbeam_utils::atomic::AtomicCell;
 use dashmap::mapref::one::Ref as DashMapRef;
-use parking_lot::{Mutex, RwLock};
 use smallvec::SmallVec;
 use std::{
     borrow::Borrow,
@@ -33,7 +32,7 @@ use std::{
     ptr::NonNull,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc,
+        Arc, Mutex, RwLock,
     },
     time::Duration,
 };
@@ -610,6 +609,7 @@ impl<K, V, S> Inner<K, V, S> {
             Instant::new(
                 self.expiration_clock
                     .read()
+                    .expect("lock poisoned")
                     .as_ref()
                     .expect("Cannot get the expiration clock")
                     .now(),
@@ -648,7 +648,7 @@ where
     S: BuildHasher + Clone + Send + Sync + 'static,
 {
     fn sync(&self, max_repeats: usize) {
-        let mut deqs = self.deques.lock();
+        let mut deqs = self.deques.lock().expect("lock poisoned");
         let mut calls = 0;
         let mut should_sync = true;
 
@@ -757,13 +757,16 @@ where
     #[inline]
     fn do_enable_frequency_sketch(&self, cache_capacity: u64) {
         let skt_capacity = common::sketch_capacity(cache_capacity);
-        self.frequency_sketch.write().ensure_capacity(skt_capacity);
+        self.frequency_sketch
+            .write()
+            .expect("lock poisoned")
+            .ensure_capacity(skt_capacity);
         self.frequency_sketch_enabled.store(true, Ordering::Release);
     }
 
     fn apply_reads(&self, deqs: &mut Deques<K>, count: usize) {
         use ReadOp::*;
-        let mut freq = self.frequency_sketch.write();
+        let mut freq = self.frequency_sketch.write().expect("lock poisoned");
         let ch = &self.read_op_ch;
         for _ in 0..count {
             match ch.try_recv() {
@@ -780,7 +783,7 @@ where
 
     fn apply_writes(&self, deqs: &mut Deques<K>, count: usize, counters: &mut EvictionCounters) {
         use WriteOp::*;
-        let freq = self.frequency_sketch.read();
+        let freq = self.frequency_sketch.read().expect("lock poisoned");
         let ch = &self.write_op_ch;
 
         for _ in 0..count {
@@ -1239,7 +1242,7 @@ where
     S: BuildHasher + Clone,
 {
     fn set_expiration_clock(&self, clock: Option<Clock>) {
-        let mut exp_clock = self.expiration_clock.write();
+        let mut exp_clock = self.expiration_clock.write().expect("lock poisoned");
         if let Some(clock) = clock {
             *exp_clock = Some(clock);
             self.has_expiration_clock.store(true, Ordering::SeqCst);
@@ -1324,7 +1327,12 @@ mod tests {
             );
             cache.inner.enable_frequency_sketch_for_testing();
             assert_eq!(
-                cache.inner.frequency_sketch.read().table_len(),
+                cache
+                    .inner
+                    .frequency_sketch
+                    .read()
+                    .expect("lock poisoned")
+                    .table_len(),
                 len as usize,
                 "{}",
                 name

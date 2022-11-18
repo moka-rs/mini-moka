@@ -1,9 +1,10 @@
-use std::{sync::Arc, time::Instant as StdInstant};
+use std::{
+    sync::{Arc, RwLock},
+    time::Instant as StdInstant,
+};
 
 #[cfg(test)]
 use std::time::Duration;
-
-use parking_lot::RwLock;
 
 pub(crate) type Instant = StdInstant;
 
@@ -23,7 +24,7 @@ impl Clock {
 
     pub(crate) fn now(&self) -> Instant {
         if let Some(mock) = &self.mock {
-            *mock.now.read()
+            *mock.now.read().expect("lock poisoned")
         } else {
             StdInstant::now()
         }
@@ -45,6 +46,6 @@ impl Default for Mock {
 #[cfg(test)]
 impl Mock {
     pub(crate) fn increment(&self, amount: Duration) {
-        *self.now.write() += amount;
+        *self.now.write().expect("lock poisoned") += amount;
     }
 }
