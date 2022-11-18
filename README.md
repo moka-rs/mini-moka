@@ -22,7 +22,7 @@ algorithm to determine which entries to evict when the capacity is exceeded.
 [release-badge]: https://img.shields.io/crates/v/mini-moka.svg
 [docs-badge]: https://docs.rs/mini-moka/badge.svg
 [deps-rs-badge]: https://deps.rs/repo/github/moka-rs/mini-moka/status.svg
-<!-- [coveralls-badge]: https://coveralls.io/repos/github/mini-moka-rs/moka/badge.svg?branch=master -->
+<!-- [coveralls-badge]: https://coveralls.io/repos/github/mini-moka-rs/moka/badge.svg?branch=main -->
 [license-badge]: https://img.shields.io/crates/l/mini-moka.svg
 <!-- [fossa-badge]: https://app.fossa.com/api/projects/git%2Bgithub.com%2Fmoka-rs%2Fmini-moka.svg?type=shield -->
 
@@ -30,7 +30,7 @@ algorithm to determine which entries to evict when the capacity is exceeded.
 [crate]: https://crates.io/crates/mini-moka
 [docs]: https://docs.rs/mini-moka
 [deps-rs]: https://deps.rs/repo/github/moka-rs/mini-moka
-<!-- [coveralls]: https://coveralls.io/github/moka-rs/mini-moka?branch=master -->
+<!-- [coveralls]: https://coveralls.io/github/moka-rs/mini-moka?branch=main -->
 <!-- [fossa]: https://app.fossa.com/projects/git%2Bgithub.com%2Fmoka-rs%2Fmini-moka?ref=badge_shield -->
 
 [moka-git]: https://github.com/moka-rs/moka
@@ -67,7 +67,7 @@ to take a look at the [Quick Cache][quick-cache] crate.
 
 ## Change Log
 
-- [CHANGELOG.md](https://github.com/moka-rs/mini-moka/blob/master/CHANGELOG.md)
+- [CHANGELOG.md](https://github.com/moka-rs/mini-moka/blob/main/CHANGELOG.md)
 
 
 ## Table of Contents
