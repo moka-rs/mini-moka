@@ -111,7 +111,9 @@ mod test {
         #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
         enum TargetArch {
             Linux64,
-            Linux32,
+            Linux32x86,
+            Linux32Arm,
+            Linux32Mips,
             MacOS64,
         }
 
@@ -119,11 +121,22 @@ mod test {
 
         // e.g. "1.64"
         let ver = option_env!("RUSTC_SEMVER").expect("RUSTC_SEMVER env var not set");
+
+        // Reference for target_os etc:
+        // https://doc.rust-lang.org/reference/conditional-compilation.html
         let arch = if cfg!(target_os = "linux") {
             if cfg!(target_pointer_width = "64") {
                 Linux64
             } else if cfg!(target_pointer_width = "32") {
-                Linux32
+                if cfg!(target_arch = "x86") {
+                    Linux32x86
+                } else if cfg!(target_arch = "arm") {
+                    Linux32Arm
+                } else if cfg!(target_arch = "mips") {
+                    Linux32Mips
+                } else {
+                    panic!("Unknown target_arch: {}", cfg!(target_arch));
+                }
             } else {
                 panic!("Unsupported pointer width for Linux");
             }
@@ -135,7 +148,8 @@ mod test {
 
         let expected_sizes = match arch {
             Linux64 => vec![("1.66", 56), ("1.51", 72)],
-            Linux32 => vec![("1.66", 56), ("1.62", 72), ("1.51", 40)],
+            Linux32x86 => vec![("1.65", 56), ("1.62", 72), ("1.51", 40)],
+            Linux32Arm | Linux32Mips => vec![("1.66", 56), ("1.62", 72), ("1.51", 40)],
             MacOS64 => vec![("1.62", 56)],
         };
 
