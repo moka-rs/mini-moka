@@ -92,7 +92,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-mini_moka = "0.9"
+mini_moka = "0.10"
 ```
 
 
