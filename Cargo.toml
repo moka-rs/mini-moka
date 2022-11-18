@@ -23,7 +23,6 @@ sync = ["dashmap"]
 [dependencies]
 crossbeam-channel = "0.5.5"
 crossbeam-utils = "0.8"
-parking_lot = "0.12"
 smallvec = "1.8"
 tagptr = "0.2"
 

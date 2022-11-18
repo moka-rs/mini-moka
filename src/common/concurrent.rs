@@ -1,7 +1,9 @@
 use crate::common::{deque::DeqNode, time::Instant};
 
-use parking_lot::Mutex;
-use std::{ptr::NonNull, sync::Arc};
+use std::{
+    ptr::NonNull,
+    sync::{Arc, Mutex},
+};
 use tagptr::TagNonNull;
 use triomphe::Arc as TrioArc;
 
@@ -184,7 +186,7 @@ impl<K, V> ValueEntry<K, V> {
         self::debug_counters::InternalGlobalDebugCounters::value_entry_created();
 
         let nodes = {
-            let other_nodes = other.nodes.lock();
+            let other_nodes = other.nodes.lock().expect("lock poisoned");
             DeqNodes {
                 access_order_q_node: other_nodes.access_order_q_node,
                 write_order_q_node: other_nodes.write_order_q_node,
@@ -223,31 +225,45 @@ impl<K, V> ValueEntry<K, V> {
     }
 
     pub(crate) fn access_order_q_node(&self) -> Option<KeyDeqNodeAo<K>> {
-        self.nodes.lock().access_order_q_node
+        self.nodes
+            .lock()
+            .expect("lock poisoned")
+            .access_order_q_node
     }
 
     pub(crate) fn set_access_order_q_node(&self, node: Option<KeyDeqNodeAo<K>>) {
-        self.nodes.lock().access_order_q_node = node;
+        self.nodes
+            .lock()
+            .expect("lock poisoned")
+            .access_order_q_node = node;
     }
 
     pub(crate) fn take_access_order_q_node(&self) -> Option<KeyDeqNodeAo<K>> {
-        self.nodes.lock().access_order_q_node.take()
+        self.nodes
+            .lock()
+            .expect("lock poisoned")
+            .access_order_q_node
+            .take()
     }
 
     pub(crate) fn write_order_q_node(&self) -> Option<KeyDeqNodeWo<K>> {
-        self.nodes.lock().write_order_q_node
+        self.nodes.lock().expect("lock poisoned").write_order_q_node
     }
 
     pub(crate) fn set_write_order_q_node(&self, node: Option<KeyDeqNodeWo<K>>) {
-        self.nodes.lock().write_order_q_node = node;
+        self.nodes.lock().expect("lock poisoned").write_order_q_node = node;
     }
 
     pub(crate) fn take_write_order_q_node(&self) -> Option<KeyDeqNodeWo<K>> {
-        self.nodes.lock().write_order_q_node.take()
+        self.nodes
+            .lock()
+            .expect("lock poisoned")
+            .write_order_q_node
+            .take()
     }
 
     pub(crate) fn unset_q_nodes(&self) {
-        let mut nodes = self.nodes.lock();
+        let mut nodes = self.nodes.lock().expect("lock poisoned");
         nodes.access_order_q_node = None;
         nodes.write_order_q_node = None;
     }
