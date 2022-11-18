@@ -1,7 +1,5 @@
 use std::time::Duration;
 
-#[cfg_attr(feature = "quanta", path = "time/clock_quanta.rs")]
-#[cfg_attr(not(feature = "quanta"), path = "time/clock_compat.rs")]
 pub(crate) mod clock;
 
 pub(crate) use clock::Clock;
@@ -24,11 +22,6 @@ impl Instant {
 
     pub(crate) fn now() -> Instant {
         Instant(clock::Instant::now())
-    }
-
-    #[cfg(feature = "quanta")]
-    pub(crate) fn inner_clock(&self) -> clock::Instant {
-        self.0
     }
 }
 

@@ -26,13 +26,9 @@ jobs:
           - target: aarch64-unknown-linux-musl
           - target: i686-unknown-linux-musl
           - target: armv7-unknown-linux-musleabihf
-          # Platforms without AtomicU64 support.
           - target: armv5te-unknown-linux-musleabi
-            cargo-opts: "--no-default-features"  # Disable atomic64 and quanta features.
           - target: mips-unknown-linux-musl
-            cargo-opts: "--no-default-features"  # Disable atomic64 and quanta features.
           - target: mipsel-unknown-linux-musl
-            cargo-opts: "--no-default-features"  # Disable atomic64 and quanta features.
 
     steps:
       - name: Checkout Moka
@@ -66,6 +62,6 @@ jobs:
         with:
           use-cross: true
           command: test
-          args: --release --features sync --target ${{ matrix.platform.target }} ${{ matrix.platform.cargo-opts }}
+          args: --release --features sync --target ${{ matrix.platform.target }}
         env:
           RUSTFLAGS: '--cfg rustver'

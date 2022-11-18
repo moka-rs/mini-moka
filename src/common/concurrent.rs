@@ -10,18 +10,6 @@ pub(crate) mod deques;
 pub(crate) mod entry_info;
 pub(crate) mod housekeeper;
 
-// target_has_atomic is more convenient but yet unstable (Rust 1.55)
-// https://github.com/rust-lang/rust/issues/32976
-// #[cfg_attr(target_has_atomic = "64", path = "common/time_atomic64.rs")]
-
-#[cfg_attr(
-    all(feature = "atomic64", feature = "quanta"),
-    path = "concurrent/atomic_time/atomic_time.rs"
-)]
-#[cfg_attr(
-    not(all(feature = "atomic64", feature = "quanta")),
-    path = "concurrent/atomic_time/atomic_time_compat.rs"
-)]
 pub(crate) mod atomic_time;
 
 use self::entry_info::EntryInfo;

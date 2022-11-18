@@ -119,7 +119,6 @@ mod test {
 
         // e.g. "1.64"
         let ver = option_env!("RUSTC_SEMVER").expect("RUSTC_SEMVER env var not set");
-        let is_quanta_enabled = cfg!(feature = "quanta");
         let arch = if cfg!(target_os = "linux") {
             if cfg!(target_pointer_width = "64") {
                 Linux64
@@ -134,13 +133,10 @@ mod test {
             panic!("Unsupported target architecture");
         };
 
-        let expected_sizes = match (arch, is_quanta_enabled) {
-            (Linux64, true) => vec![("1.51", 24)],
-            (Linux32, true) => vec![("1.51", 24)],
-            (MacOS64, true) => vec![("1.62", 24)],
-            (Linux64, false) => vec![("1.66", 56), ("1.51", 72)],
-            (Linux32, false) => vec![("1.66", 56), ("1.62", 72), ("1.51", 40)],
-            (MacOS64, false) => vec![("1.62", 56)],
+        let expected_sizes = match arch {
+            Linux64 => vec![("1.66", 56), ("1.51", 72)],
+            Linux32 => vec![("1.66", 56), ("1.62", 72), ("1.51", 40)],
+            MacOS64 => vec![("1.62", 56)],
         };
 
         let mut expected = None;

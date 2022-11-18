@@ -46,14 +46,6 @@ jobs:
         env:
           RUSTFLAGS: '--cfg skeptic'
 
-      - name: Run tests (sync feature, without atomic64 and quanta)
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --release --no-default-features --features 'sync'
-        env:
-          RUSTFLAGS: '--cfg skeptic'
-
       - name: Run compile error tests (sync feature, trybuild)
         uses: actions-rs/cargo@v1
         if: ${{ matrix.rust == 'stable' }}
