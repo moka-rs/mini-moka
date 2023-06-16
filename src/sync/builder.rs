@@ -1,4 +1,6 @@
 use super::Cache;
+use crate::sync::EvictionHandler;
+
 use crate::{common::builder_utils, common::concurrent::Weigher};
 
 use std::{
@@ -47,6 +49,7 @@ pub struct CacheBuilder<K, V, C> {
     time_to_live: Option<Duration>,
     time_to_idle: Option<Duration>,
     cache_type: PhantomData<C>,
+    eviction_handler: Option<Box<dyn EvictionHandler<K, V>>>,
 }
 
 impl<K, V> Default for CacheBuilder<K, V, Cache<K, V, RandomState>>
@@ -62,6 +65,7 @@ where
             time_to_live: None,
             time_to_idle: None,
             cache_type: Default::default(),
+            eviction_handler: None,
         }
     }
 }
@@ -100,6 +104,7 @@ where
             self.weigher,
             self.time_to_live,
             self.time_to_idle,
+            self.eviction_handler,
         )
     }
 
@@ -125,6 +130,7 @@ where
             self.weigher,
             self.time_to_live,
             self.time_to_idle,
+            self.eviction_handler,
         )
     }
 }
@@ -170,6 +176,14 @@ impl<K, V, C> CacheBuilder<K, V, C> {
     pub fn time_to_live(self, duration: Duration) -> Self {
         Self {
             time_to_live: Some(duration),
+            ..self
+        }
+    }
+
+    /// Sets the eviction handler
+    pub fn eviction_handler(self, eviction_handler: Box<dyn EvictionHandler<K, V>>) -> Self {
+        Self {
+            eviction_handler: Some(eviction_handler),
             ..self
         }
     }

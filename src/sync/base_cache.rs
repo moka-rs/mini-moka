@@ -18,6 +18,7 @@ use crate::{
         time::{CheckedTimeOps, Clock, Instant},
         CacheRegion,
     },
+    sync::EvictionHandler,
     Policy,
 };
 
@@ -29,6 +30,7 @@ use std::{
     borrow::Borrow,
     collections::hash_map::RandomState,
     hash::{BuildHasher, Hash, Hasher},
+    marker::PhantomData,
     ptr::NonNull,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -43,6 +45,27 @@ pub(crate) struct BaseCache<K, V, S = RandomState> {
     read_op_ch: Sender<ReadOp<K, V>>,
     pub(crate) write_op_ch: Sender<WriteOp<K, V>>,
     pub(crate) housekeeper: Option<Arc<Housekeeper>>,
+}
+
+struct DefaultEvictionHandler<K, V> {
+    pk: PhantomData<K>,
+    pv: PhantomData<V>,
+}
+
+impl<K, V> EvictionHandler<K, V> for DefaultEvictionHandler<K, V>
+where
+    K: Send + Sync,
+    V: Send + Sync,
+{
+}
+
+impl<K, V> DefaultEvictionHandler<K, V> {
+    fn new() -> Self {
+        DefaultEvictionHandler {
+            pk: PhantomData {},
+            pv: PhantomData {},
+        }
+    }
 }
 
 impl<K, V, S> Clone for BaseCache<K, V, S> {
@@ -94,6 +117,7 @@ where
         weigher: Option<Weigher<K, V>>,
         time_to_live: Option<Duration>,
         time_to_idle: Option<Duration>,
+        eviction_handler: Option<Box<dyn EvictionHandler<K, V>>>,
     ) -> Self {
         let (r_snd, r_rcv) = crossbeam_channel::bounded(READ_LOG_SIZE);
         let (w_snd, w_rcv) = crossbeam_channel::bounded(WRITE_LOG_SIZE);
@@ -107,6 +131,7 @@ where
             w_rcv,
             time_to_live,
             time_to_idle,
+            eviction_handler,
         );
         Self {
             #[cfg_attr(beta_clippy, allow(clippy::arc_with_non_send_sync))]
@@ -265,11 +290,12 @@ where
     }
 
     #[inline]
-    pub(crate) fn do_insert_with_hash(
+    pub(crate) fn do_upsert_with_hash(
         &self,
         key: Arc<K>,
         hash: u64,
-        value: V,
+        mut value: V,
+        update: impl FnOnce(&mut V),
     ) -> (WriteOp<K, V>, Instant) {
         let ts = self.inner.current_time_from_expiration_clock();
         let weight = self.inner.weigh(&key, &value);
@@ -287,6 +313,7 @@ where
                 //    prevent this new ValueEntry from being evicted by an expiration policy.
                 // 3. This method will update the policy_weight with the new weight.
                 let old_weight = entry.policy_weight();
+                update(&mut value);
                 *entry = self.new_value_entry_from(value.clone(), ts, weight, entry);
                 update_op = Some(WriteOp::Upsert {
                     key_hash: KeyHash::new(Arc::clone(&key), hash),
@@ -312,6 +339,16 @@ where
             (None, Some(upd_op)) => (upd_op, ts),
             _ => unreachable!(),
         }
+    }
+
+    #[inline]
+    pub(crate) fn do_insert_with_hash(
+        &self,
+        key: Arc<K>,
+        hash: u64,
+        value: V,
+    ) -> (WriteOp<K, V>, Instant) {
+        self.do_upsert_with_hash(key, hash, value, |_| {})
     }
 
     #[inline]
@@ -468,6 +505,7 @@ pub(crate) struct Inner<K, V, S> {
     weigher: Option<Weigher<K, V>>,
     has_expiration_clock: AtomicBool,
     expiration_clock: RwLock<Option<Clock>>,
+    eviction_handler: RwLock<Box<dyn EvictionHandler<K, V>>>,
 }
 
 // functions/methods used by BaseCache
@@ -489,12 +527,17 @@ where
         write_op_ch: Receiver<WriteOp<K, V>>,
         time_to_live: Option<Duration>,
         time_to_idle: Option<Duration>,
+        eviction_handler: Option<Box<dyn EvictionHandler<K, V>>>,
     ) -> Self {
         let initial_capacity = initial_capacity
             .map(|cap| cap + WRITE_LOG_SIZE)
             .unwrap_or_default();
         let cache =
             dashmap::DashMap::with_capacity_and_hasher(initial_capacity, build_hasher.clone());
+
+        let eviction_handler = RwLock::new(
+            eviction_handler.unwrap_or_else(|| Box::new(DefaultEvictionHandler::new())),
+        );
 
         Self {
             max_capacity,
@@ -513,6 +556,7 @@ where
             weigher,
             has_expiration_clock: AtomicBool::new(false),
             expiration_clock: RwLock::new(None),
+            eviction_handler,
         }
     }
 
@@ -525,6 +569,32 @@ where
         let mut hasher = self.build_hasher.build_hasher();
         key.hash(&mut hasher);
         hasher.finish()
+    }
+
+    #[inline]
+    pub(crate) fn remove(&self, k: &K) -> Option<(Arc<K>, TrioArc<ValueEntry<K, V>>)> {
+        self.cache.remove(k).map(|(k, v)| {
+            self.eviction_handler
+                .read()
+                .unwrap()
+                .on_remove(k.clone(), &v.value);
+            (k, v)
+        })
+    }
+
+    #[inline]
+    pub(crate) fn remove_if(
+        &self,
+        k: &K,
+        f: impl FnOnce(&Arc<K>, &TrioArc<ValueEntry<K, V>>) -> bool,
+    ) -> Option<(Arc<K>, TrioArc<ValueEntry<K, V>>)> {
+        self.cache.remove_if(k, f).map(|(k, v)| {
+            self.eviction_handler
+                .read()
+                .unwrap()
+                .on_remove(k.clone(), &v.value);
+            (k, v)
+        })
     }
 
     #[inline]
@@ -542,9 +612,13 @@ where
         Arc<K>: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
-        self.cache
-            .remove(key)
-            .map(|(key, entry)| KvEntry::new(key, entry))
+        self.cache.remove(key).map(|(key, entry)| {
+            self.eviction_handler
+                .read()
+                .unwrap()
+                .on_remove(key.clone(), &entry.value);
+            KvEntry::new(key, entry)
+        })
     }
 }
 
@@ -835,7 +909,8 @@ where
         if let Some(max) = self.max_capacity {
             if new_weight as u64 > max {
                 // The candidate is too big to fit in the cache. Reject it.
-                self.cache.remove(&Arc::clone(&kh.key));
+                self.remove(&Arc::clone(&kh.key))
+                    .map(|(k, v)| self.eviction_handler.read().unwrap().on_remove(k, &v.value));
                 return;
             }
         }
@@ -853,7 +928,7 @@ where
                 // Try to remove the victims from the cache (hash map).
                 for victim in victim_nodes {
                     if let Some((_vic_key, vic_entry)) =
-                        self.cache.remove(unsafe { victim.as_ref().element.key() })
+                        self.remove(unsafe { victim.as_ref().element.key() })
                     {
                         // And then remove the victim from the deques.
                         Self::handle_remove(deqs, vic_entry, counters);
@@ -872,7 +947,7 @@ where
             AdmissionResult::Rejected { skipped_nodes: s } => {
                 skipped_nodes = s;
                 // Remove the candidate from the cache (hash map).
-                self.cache.remove(&Arc::clone(&kh.key));
+                self.remove(&Arc::clone(&kh.key));
             }
         };
 
@@ -1079,9 +1154,7 @@ where
             // expired. This check is needed because it is possible that the entry in
             // the map has been updated or deleted but its deque node we checked
             // above have not been updated yet.
-            let maybe_entry = self
-                .cache
-                .remove_if(key, |_, v| is_expired_entry_ao(tti, va, v, now));
+            let maybe_entry = self.remove_if(key, |_, v| is_expired_entry_ao(tti, va, v, now));
 
             if let Some((_k, entry)) = maybe_entry {
                 Self::handle_remove_with_deques(deq_name, deq, write_order_deq, entry, counters);
@@ -1145,9 +1218,7 @@ where
 
             let key = key.as_ref().unwrap();
 
-            let maybe_entry = self
-                .cache
-                .remove_if(key, |_, v| is_expired_entry_wo(ttl, va, v, now));
+            let maybe_entry = self.remove_if(key, |_, v| is_expired_entry_wo(ttl, va, v, now));
 
             if let Some((_k, entry)) = maybe_entry {
                 Self::handle_remove(deqs, entry, counters);
@@ -1209,7 +1280,7 @@ where
                 None => break,
             };
 
-            let maybe_entry = self.cache.remove_if(&key, |_, v| {
+            let maybe_entry = self.remove_if(&key, |_, v| {
                 if let Some(lm) = v.last_modified() {
                     lm == ts
                 } else {
@@ -1317,6 +1388,7 @@ mod tests {
                 Some(max_capacity),
                 None,
                 RandomState::default(),
+                None,
                 None,
                 None,
                 None,

@@ -1,4 +1,6 @@
-use super::{base_cache::BaseCache, CacheBuilder, ConcurrentCacheExt, EntryRef, Iter};
+use super::{
+    base_cache::BaseCache, CacheBuilder, ConcurrentCacheExt, EntryRef, EvictionHandler, Iter,
+};
 use crate::{
     common::{
         concurrent::{
@@ -290,7 +292,15 @@ where
     /// [builder-struct]: ./struct.CacheBuilder.html
     pub fn new(max_capacity: u64) -> Self {
         let build_hasher = RandomState::default();
-        Self::with_everything(Some(max_capacity), None, build_hasher, None, None, None)
+        Self::with_everything(
+            Some(max_capacity),
+            None,
+            build_hasher,
+            None,
+            None,
+            None,
+            None,
+        )
     }
 
     /// Returns a [`CacheBuilder`][builder-struct], which can builds a `Cache` with
@@ -374,6 +384,7 @@ where
         weigher: Option<Weigher<K, V>>,
         time_to_live: Option<Duration>,
         time_to_idle: Option<Duration>,
+        eviction_handler: Option<Box<dyn EvictionHandler<K, V>>>,
     ) -> Self {
         Self {
             base: BaseCache::new(
@@ -383,6 +394,7 @@ where
                 weigher,
                 time_to_live,
                 time_to_idle,
+                eviction_handler,
             ),
         }
     }
@@ -439,6 +451,36 @@ where
         let hash = self.base.hash(&key);
         let key = Arc::new(key);
         self.insert_with_hash(key, hash, value)
+    }
+
+    /// Inserts a key-value pair into the cache.
+    ///
+    /// If the cache has this key present, the value is updated using the
+    /// passed update function.
+    pub fn upsert(&self, key: K, value: V, update: impl FnOnce(&mut V)) -> Option<V> {
+        let hash = self.base.hash(&key);
+        let key = Arc::new(key);
+        let (op, now) = self.base.do_upsert_with_hash(key, hash, value, update);
+
+        let v = match &op {
+            WriteOp::Upsert {
+                key_hash: _,
+                value_entry,
+                old_weight: _,
+                new_weight: _,
+            } => Some(value_entry.value.clone()),
+            _ => None,
+        };
+        let hk = self.base.housekeeper.as_ref();
+        Self::schedule_write_op(
+            self.base.inner.as_ref(),
+            &self.base.write_op_ch,
+            op,
+            now,
+            hk,
+        )
+        .expect("Failed to insert");
+        v
     }
 
     pub(crate) fn insert_with_hash(&self, key: Arc<K>, hash: u64, value: V) {
@@ -1112,5 +1154,42 @@ mod tests {
         assert!(debug_str.contains(r#"'b': "bob""#));
         assert!(debug_str.contains(r#"'c': "cindy""#));
         assert!(debug_str.ends_with('}'));
+    }
+
+    #[test]
+    fn test_upsert() {
+        let cache = Cache::new(10);
+
+        let v = vec![1];
+        let mut v2 = vec![2];
+        let k = "foo";
+
+        let maybe_result = cache.upsert(k, v, |v1| {
+            let mut v2 = v2.clone();
+            v1.append(&mut v2);
+        });
+
+        assert!(maybe_result.is_some());
+        let result = maybe_result.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], 1);
+
+        let maybe_result = cache.get(&"foo");
+
+        assert!(maybe_result.is_some());
+        let result = maybe_result.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], 1);
+
+        let v = vec![1];
+        let maybe_result = cache.upsert(k, v, move |v1| {
+            v1.append(&mut v2);
+        });
+
+        assert!(maybe_result.is_some());
+        let result = maybe_result.unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], 1);
+        assert_eq!(result[1], 2);
     }
 }
