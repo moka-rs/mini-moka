@@ -30,7 +30,6 @@ use std::{
     borrow::Borrow,
     collections::hash_map::RandomState,
     hash::{BuildHasher, Hash, Hasher},
-    marker::PhantomData,
     ptr::NonNull,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -45,27 +44,6 @@ pub(crate) struct BaseCache<K, V, S = RandomState> {
     read_op_ch: Sender<ReadOp<K, V>>,
     pub(crate) write_op_ch: Sender<WriteOp<K, V>>,
     pub(crate) housekeeper: Option<Arc<Housekeeper>>,
-}
-
-struct DefaultEvictionHandler<K, V> {
-    pk: PhantomData<K>,
-    pv: PhantomData<V>,
-}
-
-impl<K, V> EvictionHandler<K, V> for DefaultEvictionHandler<K, V>
-where
-    K: Send + Sync,
-    V: Send + Sync,
-{
-}
-
-impl<K, V> DefaultEvictionHandler<K, V> {
-    fn new() -> Self {
-        DefaultEvictionHandler {
-            pk: PhantomData {},
-            pv: PhantomData {},
-        }
-    }
 }
 
 impl<K, V, S> Clone for BaseCache<K, V, S> {
@@ -117,7 +95,7 @@ where
         weigher: Option<Weigher<K, V>>,
         time_to_live: Option<Duration>,
         time_to_idle: Option<Duration>,
-        eviction_handler: Option<Box<dyn EvictionHandler<K, V>>>,
+        eviction_handler: Box<dyn EvictionHandler<K, V>>,
     ) -> Self {
         let (r_snd, r_rcv) = crossbeam_channel::bounded(READ_LOG_SIZE);
         let (w_snd, w_rcv) = crossbeam_channel::bounded(WRITE_LOG_SIZE);
@@ -527,7 +505,7 @@ where
         write_op_ch: Receiver<WriteOp<K, V>>,
         time_to_live: Option<Duration>,
         time_to_idle: Option<Duration>,
-        eviction_handler: Option<Box<dyn EvictionHandler<K, V>>>,
+        eviction_handler: Box<dyn EvictionHandler<K, V>>,
     ) -> Self {
         let initial_capacity = initial_capacity
             .map(|cap| cap + WRITE_LOG_SIZE)
@@ -535,10 +513,7 @@ where
         let cache =
             dashmap::DashMap::with_capacity_and_hasher(initial_capacity, build_hasher.clone());
 
-        let eviction_handler = RwLock::new(
-            eviction_handler.unwrap_or_else(|| Box::new(DefaultEvictionHandler::new())),
-        );
-
+        let eviction_handler = RwLock::new(eviction_handler);
         Self {
             max_capacity,
             entry_count: Default::default(),
@@ -1374,6 +1349,7 @@ fn is_expired_entry_wo(
 #[cfg(test)]
 mod tests {
     use super::BaseCache;
+    use crate::sync::cache::DefaultEvictionHandler;
 
     #[cfg_attr(target_pointer_width = "16", ignore)]
     #[test]
@@ -1391,7 +1367,7 @@ mod tests {
                 None,
                 None,
                 None,
-                None,
+                Box::new(DefaultEvictionHandler::new()),
             );
             cache.inner.enable_frequency_sketch_for_testing();
             assert_eq!(

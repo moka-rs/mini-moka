@@ -1,5 +1,5 @@
 use super::Cache;
-use crate::sync::EvictionHandler;
+use crate::sync::{cache::DefaultEvictionHandler, EvictionHandler};
 
 use crate::{common::builder_utils, common::concurrent::Weigher};
 
@@ -97,6 +97,9 @@ where
     pub fn build(self) -> Cache<K, V, RandomState> {
         let build_hasher = RandomState::default();
         builder_utils::ensure_expirations_or_panic(self.time_to_live, self.time_to_idle);
+        let eviction_handler = self
+            .eviction_handler
+            .unwrap_or_else(|| Box::new(DefaultEvictionHandler::new()));
         Cache::with_everything(
             self.max_capacity,
             self.initial_capacity,
@@ -104,7 +107,7 @@ where
             self.weigher,
             self.time_to_live,
             self.time_to_idle,
-            self.eviction_handler,
+            eviction_handler,
         )
     }
 
@@ -123,6 +126,9 @@ where
         S: BuildHasher + Clone + Send + Sync + 'static,
     {
         builder_utils::ensure_expirations_or_panic(self.time_to_live, self.time_to_idle);
+        let eviction_handler = self
+            .eviction_handler
+            .unwrap_or_else(|| Box::new(DefaultEvictionHandler::new()));
         Cache::with_everything(
             self.max_capacity,
             self.initial_capacity,
@@ -130,12 +136,16 @@ where
             self.weigher,
             self.time_to_live,
             self.time_to_idle,
-            self.eviction_handler,
+            eviction_handler,
         )
     }
 }
 
-impl<K, V, C> CacheBuilder<K, V, C> {
+impl<K, V, C> CacheBuilder<K, V, C>
+where
+    K: Send + Sync,
+    V: Send + Sync,
+{
     /// Sets the max capacity of the cache.
     pub fn max_capacity(self, max_capacity: u64) -> Self {
         Self {
@@ -181,9 +191,9 @@ impl<K, V, C> CacheBuilder<K, V, C> {
     }
 
     /// Sets the eviction handler
-    pub fn eviction_handler(self, eviction_handler: Box<dyn EvictionHandler<K, V>>) -> Self {
+    pub fn eviction_handler(self, eviction_handler: impl EvictionHandler<K, V> + 'static) -> Self {
         Self {
-            eviction_handler: Some(eviction_handler),
+            eviction_handler: Some(Box::new(eviction_handler)),
             ..self
         }
     }

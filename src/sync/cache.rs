@@ -19,6 +19,7 @@ use std::{
     collections::hash_map::RandomState,
     fmt,
     hash::{BuildHasher, Hash},
+    marker::PhantomData,
     sync::Arc,
     time::Duration,
 };
@@ -299,7 +300,7 @@ where
             None,
             None,
             None,
-            None,
+            Box::new(DefaultEvictionHandler::new()),
         )
     }
 
@@ -384,7 +385,7 @@ where
         weigher: Option<Weigher<K, V>>,
         time_to_live: Option<Duration>,
         time_to_idle: Option<Duration>,
-        eviction_handler: Option<Box<dyn EvictionHandler<K, V>>>,
+        eviction_handler: Box<dyn EvictionHandler<K, V>>,
     ) -> Self {
         Self {
             base: BaseCache::new(
@@ -659,6 +660,27 @@ where
 
     pub(crate) fn set_expiration_clock(&self, clock: Option<crate::common::time::Clock>) {
         self.base.set_expiration_clock(clock);
+    }
+}
+
+pub(crate) struct DefaultEvictionHandler<K, V> {
+    pk: PhantomData<K>,
+    pv: PhantomData<V>,
+}
+
+impl<K, V> EvictionHandler<K, V> for DefaultEvictionHandler<K, V>
+where
+    K: Send + Sync,
+    V: Send + Sync,
+{
+}
+
+impl<K, V> DefaultEvictionHandler<K, V> {
+    pub(crate) fn new() -> Self {
+        DefaultEvictionHandler {
+            pk: PhantomData {},
+            pv: PhantomData {},
+        }
     }
 }
 
