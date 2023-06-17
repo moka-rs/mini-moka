@@ -1,5 +1,11 @@
 # Mini Moka Cache &mdash; Change Log
 
+## Version 0.10.1 (Unreleased)
+
+Bumped the minimum supported Rust version (MSRV) to 1.61 (May 19, 2022).
+([#5][gh-pull-0005])
+
+
 ## Version 0.10.0
 
 In this version, we removed some dependencies from Mini Moka to make it more
@@ -34,5 +40,6 @@ lightweight.
 <!-- Links -->
 [moka-v0.9.6]: https://github.com/moka-rs/moka/tree/v0.9.6
 
+[gh-pull-0005]: https://github.com/moka-rs/mini-moka/pull/5/
 [gh-pull-0002]: https://github.com/moka-rs/mini-moka/pull/2/
 [gh-pull-0001]: https://github.com/moka-rs/mini-moka/pull/1/

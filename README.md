@@ -268,9 +268,9 @@ key expiration.
 
 Mini Moka's minimum supported Rust versions (MSRV) are the followings:
 
-| Feature          | MSRV                     |
-|:-----------------|:------------------------:|
-| default features | Rust 1.51.0 (2021-03-25) |
+| Feature          | MSRV                       |
+|:-----------------|:--------------------------:|
+| default features | Rust 1.61.0 (May 19, 2022) |
 
 It will keep a rolling MSRV policy of at least 6 months. If only the default features
 are enabled, MSRV will be updated conservatively. When using other features, MSRV
