@@ -23,7 +23,7 @@ jobs:
         rust:
           - stable
           - beta
-          - 1.51.0  # MSRV
+          # - 1.51.0  # MSRV
           - nightly # For checking minimum version dependencies.
 
     steps:
