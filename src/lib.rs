@@ -1,7 +1,6 @@
 #![warn(clippy::all)]
 #![warn(rust_2018_idioms)]
-// Temporary disable this lint as the MSRV (1.51) require an older lint name:
-// #![deny(rustdoc::broken_intra_doc_links)]
+#![deny(rustdoc::broken_intra_doc_links)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 //! Mini Moka is a fast, concurrent cache library for Rust. Mini Moka is a light
@@ -50,9 +49,9 @@
 //!
 //! This crate's minimum supported Rust versions (MSRV) are the followings:
 //!
-//! | Feature    | Enabled by default? | MSRV        |
-//! |:-----------|:-------------------:|:-----------:|
-//! | no feature |                     | Rust 1.51.0 |
+//! | Feature          | MSRV                       |
+//! |:-----------------|:--------------------------:|
+//! | default features | Rust 1.61.0 (May 19, 2022) |
 //!
 //! If only the default features are enabled, MSRV will be updated conservatively.
 //! When using other features, MSRV might be updated more frequently, up to the
