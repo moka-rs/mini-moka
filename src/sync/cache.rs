@@ -687,10 +687,13 @@ impl<K, V> DefaultEvictionHandler<K, V> {
 // To see the debug prints, run test as `cargo test -- --nocapture`
 #[cfg(test)]
 mod tests {
-    use super::{Cache, ConcurrentCacheExt};
+    use super::{Cache, ConcurrentCacheExt, EvictionHandler};
     use crate::common::time::Clock;
 
-    use std::{sync::Arc, time::Duration};
+    use std::{
+        sync::{Arc, Mutex},
+        time::Duration,
+    };
 
     #[test]
     fn basic_single_thread() {
@@ -1213,5 +1216,73 @@ mod tests {
         assert_eq!(result.len(), 2);
         assert_eq!(result[0], 1);
         assert_eq!(result[1], 2);
+    }
+
+    struct TestEvictionHandler {
+        removed_keys: Arc<Mutex<Vec<String>>>,
+    }
+
+    impl TestEvictionHandler {
+        fn new(removed_keys: Arc<Mutex<Vec<String>>>) -> Self {
+            TestEvictionHandler { removed_keys }
+        }
+    }
+
+    impl EvictionHandler<String, String> for TestEvictionHandler {
+        fn on_remove(&self, k: Arc<String>, _: &String) {
+            self.removed_keys.lock().unwrap().push((*k).clone())
+        }
+    }
+
+    #[test]
+    fn test_eviction_handler_on_ttl() {
+        let removed_keys = Arc::new(Mutex::new(Vec::new()));
+        let handler = TestEvictionHandler::new(removed_keys.clone());
+        let cache = Cache::builder()
+            .time_to_live(Duration::from_millis(250))
+            .eviction_handler(handler)
+            .build();
+
+        cache.insert("Foo".to_owned(), "Bar".to_owned());
+        std::thread::sleep(Duration::from_millis(250));
+        cache.sync();
+        let keys = removed_keys.lock().unwrap();
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0], "Foo");
+    }
+
+    #[test]
+    fn test_eviction_handler_on_tti() {
+        let removed_keys = Arc::new(Mutex::new(Vec::new()));
+        let handler = TestEvictionHandler::new(removed_keys.clone());
+        let cache = Cache::builder()
+            .time_to_idle(Duration::from_millis(250))
+            .eviction_handler(handler)
+            .build();
+
+        cache.insert("Foo".to_owned(), "Bar".to_owned());
+        std::thread::sleep(Duration::from_millis(250));
+        cache.sync();
+        let keys = removed_keys.lock().unwrap();
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0], "Foo");
+    }
+
+    #[test]
+    fn test_eviction_handler_on_get() {
+        let removed_keys = Arc::new(Mutex::new(Vec::new()));
+        let handler = TestEvictionHandler::new(removed_keys.clone());
+        let cache = Cache::builder()
+            .time_to_live(Duration::from_millis(250))
+            .eviction_handler(handler)
+            .build();
+
+        cache.insert("Foo".to_owned(), "Bar".to_owned());
+        std::thread::sleep(Duration::from_millis(250));
+        let res = cache.get(&"Foo".to_owned());
+        assert!(res.is_none());
+        let keys = removed_keys.lock().unwrap();
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0], "Foo");
     }
 }
