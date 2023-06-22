@@ -458,20 +458,10 @@ where
     ///
     /// If the cache has this key present, the value is updated using the
     /// passed update function.
-    pub fn upsert(&self, key: K, value: V, update: impl FnOnce(&mut V)) -> Option<V> {
+    pub fn upsert(&self, key: K, value: V, update: impl FnOnce(&mut V)) {
         let hash = self.base.hash(&key);
         let key = Arc::new(key);
         let (op, now) = self.base.do_upsert_with_hash(key, hash, value, update);
-
-        let v = match &op {
-            WriteOp::Upsert {
-                key_hash: _,
-                value_entry,
-                old_weight: _,
-                new_weight: _,
-            } => Some(value_entry.value.clone()),
-            _ => None,
-        };
         let hk = self.base.housekeeper.as_ref();
         Self::schedule_write_op(
             self.base.inner.as_ref(),
@@ -481,7 +471,6 @@ where
             hk,
         )
         .expect("Failed to insert");
-        v
     }
 
     pub(crate) fn insert_with_hash(&self, key: Arc<K>, hash: u64, value: V) {
@@ -1189,10 +1178,11 @@ mod tests {
         let mut v2 = vec![2];
         let k = "foo";
 
-        let maybe_result = cache.upsert(k, v, |v1| {
+        cache.upsert(k, v, |v1| {
             let mut v2 = v2.clone();
             v1.append(&mut v2);
         });
+        let maybe_result = cache.get(&"foo");
 
         assert!(maybe_result.is_some());
         let result = maybe_result.unwrap();
@@ -1207,9 +1197,11 @@ mod tests {
         assert_eq!(result[0], 1);
 
         let v = vec![1];
-        let maybe_result = cache.upsert(k, v, move |v1| {
+        cache.upsert(k, v, move |v1| {
             v1.append(&mut v2);
         });
+
+        let maybe_result = cache.get(&"foo");
 
         assert!(maybe_result.is_some());
         let result = maybe_result.unwrap();
