@@ -646,12 +646,19 @@ where
     pub(crate) fn reconfigure_for_testing(&mut self) {
         self.base.reconfigure_for_testing();
     }
+}
 
-    pub(crate) fn set_expiration_clock(&self, clock: Option<crate::common::time::Clock>) {
+#[cfg(any(test, feature = "testing"))]
+impl<K, V, S> Cache<K, V, S>
+where
+    K: Hash + Eq + Send + Sync + 'static,
+    V: Clone + Send + Sync + 'static,
+    S: BuildHasher + Clone + Send + Sync + 'static,
+{
+    pub fn set_expiration_clock(&self, clock: Option<crate::common::time::Clock>) {
         self.base.set_expiration_clock(clock);
     }
 }
-
 pub(crate) struct DefaultEvictionHandler<K, V> {
     pk: PhantomData<K>,
     pv: PhantomData<V>,

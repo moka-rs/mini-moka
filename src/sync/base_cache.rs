@@ -391,8 +391,16 @@ where
         // Enable the frequency sketch.
         self.inner.enable_frequency_sketch_for_testing();
     }
+}
 
-    pub(crate) fn set_expiration_clock(&self, clock: Option<Clock>) {
+#[cfg(any(test, feature = "testing"))]
+impl<K, V, S> BaseCache<K, V, S>
+where
+    K: Hash + Eq + Send + Sync + 'static,
+    V: Clone + Send + Sync + 'static,
+    S: BuildHasher + Clone + Send + Sync + 'static,
+{
+    pub fn set_expiration_clock(&self, clock: Option<Clock>) {
         self.inner.set_expiration_clock(clock);
     }
 }
@@ -1277,7 +1285,7 @@ where
 //
 // for testing
 //
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 impl<K, V, S> Inner<K, V, S>
 where
     K: Hash + Eq,
