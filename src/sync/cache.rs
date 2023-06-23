@@ -458,7 +458,7 @@ where
     ///
     /// If the cache has this key present, the value is updated using the
     /// passed update function.
-    pub fn upsert(&self, key: K, value: V, update: impl FnOnce(&mut V)) {
+    pub fn upsert(&self, key: K, value: V, update: impl FnOnce(&mut V, &mut V)) {
         let hash = self.base.hash(&key);
         let key = Arc::new(key);
         let (op, now) = self.base.do_upsert_with_hash(key, hash, value, update);
@@ -1182,12 +1182,10 @@ mod tests {
         let cache = Cache::new(10);
 
         let v = vec![1];
-        let mut v2 = vec![2];
         let k = "foo";
 
-        cache.upsert(k, v, |v1| {
-            let mut v2 = v2.clone();
-            v1.append(&mut v2);
+        cache.upsert(k, v, |v1, v2| {
+            v1.append(v2);
         });
         let maybe_result = cache.get(&"foo");
 
@@ -1203,9 +1201,9 @@ mod tests {
         assert_eq!(result.len(), 1);
         assert_eq!(result[0], 1);
 
-        let v = vec![1];
-        cache.upsert(k, v, move |v1| {
-            v1.append(&mut v2);
+        let v = vec![5];
+        cache.upsert(k, v, move |v1, v2| {
+            v1.append(v2);
         });
 
         let maybe_result = cache.get(&"foo");
@@ -1214,7 +1212,7 @@ mod tests {
         let result = maybe_result.unwrap();
         assert_eq!(result.len(), 2);
         assert_eq!(result[0], 1);
-        assert_eq!(result[1], 2);
+        assert_eq!(result[1], 5);
     }
 
     struct TestEvictionHandler {

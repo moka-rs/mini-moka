@@ -273,7 +273,7 @@ where
         key: Arc<K>,
         hash: u64,
         mut value: V,
-        update: impl FnOnce(&mut V),
+        update: impl FnOnce(&mut V, &mut V),
     ) -> (WriteOp<K, V>, Instant) {
         let ts = self.inner.current_time_from_expiration_clock();
         let weight = self.inner.weigh(&key, &value);
@@ -291,8 +291,9 @@ where
                 //    prevent this new ValueEntry from being evicted by an expiration policy.
                 // 3. This method will update the policy_weight with the new weight.
                 let old_weight = entry.policy_weight();
-                update(&mut value);
-                *entry = self.new_value_entry_from(value.clone(), ts, weight, entry);
+                let mut old_value = entry.value.clone();
+                update(&mut old_value, &mut value);
+                *entry = self.new_value_entry_from(old_value, ts, weight, entry);
                 update_op = Some(WriteOp::Upsert {
                     key_hash: KeyHash::new(Arc::clone(&key), hash),
                     value_entry: TrioArc::clone(entry),
@@ -326,7 +327,9 @@ where
         hash: u64,
         value: V,
     ) -> (WriteOp<K, V>, Instant) {
-        self.do_upsert_with_hash(key, hash, value, |_| {})
+        self.do_upsert_with_hash(key, hash, value, |original, new| {
+            std::mem::swap(original, new)
+        })
     }
 
     #[inline]
@@ -1291,7 +1294,7 @@ where
     K: Hash + Eq,
     S: BuildHasher + Clone,
 {
-    fn set_expiration_clock(&self, clock: Option<Clock>) {
+    pub fn set_expiration_clock(&self, clock: Option<Clock>) {
         let mut exp_clock = self.expiration_clock.write().expect("lock poisoned");
         if let Some(clock) = clock {
             *exp_clock = Some(clock);
