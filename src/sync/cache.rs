@@ -1241,9 +1241,11 @@ mod tests {
             .time_to_live(Duration::from_millis(250))
             .eviction_handler(handler)
             .build();
+        let (clock, mock) = Clock::mock();
+        cache.set_expiration_clock(Some(clock));
 
         cache.insert("Foo".to_owned(), "Bar".to_owned());
-        std::thread::sleep(Duration::from_millis(250));
+        mock.increment(Duration::from_millis(250));
         cache.sync();
         let keys = removed_keys.lock().unwrap();
         assert_eq!(keys.len(), 1);
@@ -1258,9 +1260,10 @@ mod tests {
             .time_to_idle(Duration::from_millis(250))
             .eviction_handler(handler)
             .build();
-
+        let (clock, mock) = Clock::mock();
+        cache.set_expiration_clock(Some(clock));
         cache.insert("Foo".to_owned(), "Bar".to_owned());
-        std::thread::sleep(Duration::from_millis(250));
+        mock.increment(Duration::from_millis(250));
         cache.sync();
         let keys = removed_keys.lock().unwrap();
         assert_eq!(keys.len(), 1);
@@ -1275,9 +1278,11 @@ mod tests {
             .time_to_live(Duration::from_millis(250))
             .eviction_handler(handler)
             .build();
-
+        let (clock, mock) = Clock::mock();
+        cache.set_expiration_clock(Some(clock));
         cache.insert("Foo".to_owned(), "Bar".to_owned());
-        std::thread::sleep(Duration::from_millis(250));
+
+        mock.increment(Duration::from_millis(250));
         let res = cache.get(&"Foo".to_owned());
         assert!(res.is_none());
         let keys = removed_keys.lock().unwrap();
