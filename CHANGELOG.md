@@ -5,6 +5,11 @@
 Bumped the minimum supported Rust version (MSRV) to 1.61 (May 19, 2022).
 ([#5][gh-pull-0005])
 
+### Fixed
+
+- Fixed the caches mutating a deque node through a `NonNull` pointer derived from a
+  shared reference. ([#6][gh-pull-0006]).
+
 
 ## Version 0.10.0
 
@@ -40,6 +45,7 @@ lightweight.
 <!-- Links -->
 [moka-v0.9.6]: https://github.com/moka-rs/moka/tree/v0.9.6
 
+[gh-pull-0006]: https://github.com/moka-rs/mini-moka/pull/6/
 [gh-pull-0005]: https://github.com/moka-rs/mini-moka/pull/5/
 [gh-pull-0002]: https://github.com/moka-rs/mini-moka/pull/2/
 [gh-pull-0001]: https://github.com/moka-rs/mini-moka/pull/1/
