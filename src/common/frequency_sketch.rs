@@ -183,11 +183,6 @@ impl FrequencySketch {
         hash += hash >> 32;
         (hash & self.table_mask) as usize
     }
-
-    #[cfg(feature = "unstable-debug-counters")]
-    pub(crate) fn table_size(&self) -> u64 {
-        (self.table.len() * std::mem::size_of::<u64>()) as u64
-    }
 }
 
 // Methods only available for testing.

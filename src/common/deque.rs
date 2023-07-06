@@ -16,9 +16,6 @@ use std::{marker::PhantomData, ptr::NonNull};
 
 use super::CacheRegion;
 
-#[cfg(feature = "unstable-debug-counters")]
-use crate::common::concurrent::debug_counters;
-
 // `crate::{sync,unsync}::DeqNodes` uses a `tagptr::TagNonNull<DeqNode<T>, 2>`
 // pointer. To reserve the space for the 2-bit tag, use 4 bytes as the *minimum*
 // alignment.
@@ -42,9 +39,6 @@ impl<T> std::fmt::Debug for DeqNode<T> {
 
 impl<T> DeqNode<T> {
     pub(crate) fn new(element: T) -> Self {
-        #[cfg(feature = "unstable-debug-counters")]
-        debug_counters::InternalGlobalDebugCounters::deq_node_created();
-
         Self {
             next: None,
             prev: None,
@@ -54,13 +48,6 @@ impl<T> DeqNode<T> {
 
     pub(crate) fn next_node_ptr(this: NonNull<Self>) -> Option<NonNull<DeqNode<T>>> {
         unsafe { this.as_ref() }.next
-    }
-}
-
-#[cfg(feature = "unstable-debug-counters")]
-impl<T> Drop for DeqNode<T> {
-    fn drop(&mut self) {
-        debug_counters::InternalGlobalDebugCounters::deq_node_dropped();
     }
 }
 
