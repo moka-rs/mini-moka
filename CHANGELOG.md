@@ -1,6 +1,6 @@
 # Mini Moka Cache &mdash; Change Log
 
-## Version 0.10.1 (Unreleased)
+## Version 0.10.1
 
 Bumped the minimum supported Rust version (MSRV) to 1.61 (May 19, 2022).
 ([#5][gh-pull-0005])
