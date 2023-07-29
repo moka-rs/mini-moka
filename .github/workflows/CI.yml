@@ -52,10 +52,9 @@ jobs:
           command: update
           args: -Z minimal-versions
 
-      # - name: Pin some dependencies to specific versions (MSRV only)
-      #   if: ${{ matrix.rust == '1.61.0' }}
-      #   run: |
-      #     cargo update -p dashmap --precise 5.2.0
+      - name: Pin some dependencies to specific versions (MSRV only)
+        if: ${{ matrix.rust == '1.61.0' }}
+        run: ./.ci_extras/pin-crate-vers-msrv.sh
 
       - name: Show cargo tree
         uses: actions-rs/cargo@v1
