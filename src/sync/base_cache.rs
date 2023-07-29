@@ -97,7 +97,8 @@ where
     ) -> Self {
         let (r_snd, r_rcv) = crossbeam_channel::bounded(READ_LOG_SIZE);
         let (w_snd, w_rcv) = crossbeam_channel::bounded(WRITE_LOG_SIZE);
-        let inner = Arc::new(Inner::new(
+
+        let inner = Inner::new(
             max_capacity,
             initial_capacity,
             build_hasher,
@@ -106,13 +107,13 @@ where
             w_rcv,
             time_to_live,
             time_to_idle,
-        ));
-        let housekeeper = Housekeeper::default();
+        );
         Self {
-            inner,
+            #[cfg_attr(beta_clippy, allow(clippy::arc_with_non_send_sync))]
+            inner: Arc::new(inner),
             read_op_ch: r_snd,
             write_op_ch: w_snd,
-            housekeeper: Some(Arc::new(housekeeper)),
+            housekeeper: Some(Arc::new(Housekeeper::default())),
         }
     }
 
