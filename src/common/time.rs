@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-pub(crate) mod clock;
+pub mod clock;
 
-pub(crate) use clock::Clock;
+pub use clock::Clock;
 
 /// a wrapper type over Instant to force checked additions and prevent
 /// unintentional overflow. The type preserve the Copy semantics for the wrapped

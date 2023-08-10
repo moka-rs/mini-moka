@@ -1,4 +1,6 @@
-use super::{base_cache::BaseCache, CacheBuilder, ConcurrentCacheExt, EntryRef, Iter};
+use super::{
+    base_cache::BaseCache, CacheBuilder, ConcurrentCacheExt, EntryRef, EvictionHandler, Iter,
+};
 use crate::{
     common::{
         concurrent::{
@@ -8,6 +10,7 @@ use crate::{
         },
         time::Instant,
     },
+    sync::default_eviction_handler,
     Policy,
 };
 
@@ -290,7 +293,15 @@ where
     /// [builder-struct]: ./struct.CacheBuilder.html
     pub fn new(max_capacity: u64) -> Self {
         let build_hasher = RandomState::default();
-        Self::with_everything(Some(max_capacity), None, build_hasher, None, None, None)
+        Self::with_everything(
+            Some(max_capacity),
+            None,
+            build_hasher,
+            None,
+            None,
+            None,
+            default_eviction_handler(),
+        )
     }
 
     /// Returns a [`CacheBuilder`][builder-struct], which can builds a `Cache` with
@@ -374,6 +385,7 @@ where
         weigher: Option<Weigher<K, V>>,
         time_to_live: Option<Duration>,
         time_to_idle: Option<Duration>,
+        eviction_handler: EvictionHandler<K, V>,
     ) -> Self {
         Self {
             base: BaseCache::new(
@@ -383,6 +395,7 @@ where
                 weigher,
                 time_to_live,
                 time_to_idle,
+                eviction_handler,
             ),
         }
     }
@@ -439,6 +452,25 @@ where
         let hash = self.base.hash(&key);
         let key = Arc::new(key);
         self.insert_with_hash(key, hash, value)
+    }
+
+    /// Inserts a key-value pair into the cache.
+    ///
+    /// If the cache has this key present, the value is updated using the
+    /// passed update function.
+    pub fn upsert(&self, key: K, value: V, update: impl FnOnce(&mut V, &mut V)) {
+        let hash = self.base.hash(&key);
+        let key = Arc::new(key);
+        let (op, now) = self.base.do_upsert_with_hash(key, hash, value, update);
+        let hk = self.base.housekeeper.as_ref();
+        Self::schedule_write_op(
+            self.base.inner.as_ref(),
+            &self.base.write_op_ch,
+            op,
+            now,
+            hk,
+        )
+        .expect("Failed to insert");
     }
 
     pub(crate) fn insert_with_hash(&self, key: Arc<K>, hash: u64, value: V) {
@@ -614,8 +646,16 @@ where
     pub(crate) fn reconfigure_for_testing(&mut self) {
         self.base.reconfigure_for_testing();
     }
+}
 
-    pub(crate) fn set_expiration_clock(&self, clock: Option<crate::common::time::Clock>) {
+#[cfg(any(test, feature = "testing"))]
+impl<K, V, S> Cache<K, V, S>
+where
+    K: Hash + Eq + Send + Sync + 'static,
+    V: Clone + Send + Sync + 'static,
+    S: BuildHasher + Clone + Send + Sync + 'static,
+{
+    pub fn set_expiration_clock(&self, clock: Option<crate::common::time::Clock>) {
         self.base.set_expiration_clock(clock);
     }
 }
@@ -624,9 +664,12 @@ where
 #[cfg(test)]
 mod tests {
     use super::{Cache, ConcurrentCacheExt};
-    use crate::common::time::Clock;
+    use crate::{common::time::Clock, sync::RemovalCause};
 
-    use std::{sync::Arc, time::Duration};
+    use std::{
+        sync::{Arc, Mutex},
+        time::Duration,
+    };
 
     #[test]
     fn basic_single_thread() {
@@ -1112,5 +1155,109 @@ mod tests {
         assert!(debug_str.contains(r#"'b': "bob""#));
         assert!(debug_str.contains(r#"'c': "cindy""#));
         assert!(debug_str.ends_with('}'));
+    }
+
+    #[test]
+    fn test_upsert() {
+        let cache = Cache::new(10);
+
+        let v = vec![1];
+        let k = "foo";
+
+        cache.upsert(k, v, |v1, v2| {
+            v1.append(v2);
+        });
+        let maybe_result = cache.get(&"foo");
+
+        assert!(maybe_result.is_some());
+        let result = maybe_result.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], 1);
+
+        let maybe_result = cache.get(&"foo");
+
+        assert!(maybe_result.is_some());
+        let result = maybe_result.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], 1);
+
+        let v = vec![5];
+        cache.upsert(k, v, move |v1, v2| {
+            v1.append(v2);
+        });
+
+        let maybe_result = cache.get(&"foo");
+
+        assert!(maybe_result.is_some());
+        let result = maybe_result.unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], 1);
+        assert_eq!(result[1], 5);
+    }
+
+    #[test]
+    fn test_eviction_handler_on_ttl() {
+        let removed_keys = Arc::new(Mutex::new(Vec::new()));
+        let rk = removed_keys.clone();
+        let cache: Cache<String, String> = Cache::builder()
+            .time_to_live(Duration::from_millis(250))
+            .eviction_handler(move |key: Arc<String>, _, cause| {
+                rk.lock().unwrap().push(((*key).clone(), cause));
+            })
+            .build();
+        let (clock, mock) = Clock::mock();
+        cache.set_expiration_clock(Some(clock));
+
+        cache.insert("Foo".to_owned(), "Bar".to_owned());
+        mock.increment(Duration::from_millis(250));
+        cache.sync();
+        let keys = removed_keys.lock().unwrap();
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0].0, "Foo");
+        assert_eq!(keys[0].1, RemovalCause::Expired);
+    }
+
+    #[test]
+    fn test_eviction_handler_on_tti() {
+        let removed_keys = Arc::new(Mutex::new(Vec::new()));
+        let rk = removed_keys.clone();
+        let cache = Cache::builder()
+            .time_to_idle(Duration::from_millis(250))
+            .eviction_handler(move |key: Arc<String>, _, cause| {
+                rk.lock().unwrap().push(((*key).clone(), cause));
+            })
+            .build();
+        let (clock, mock) = Clock::mock();
+        cache.set_expiration_clock(Some(clock));
+        cache.insert("Foo".to_owned(), "Bar".to_owned());
+        mock.increment(Duration::from_millis(250));
+        cache.sync();
+        let keys = removed_keys.lock().unwrap();
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0].0, "Foo");
+        assert_eq!(keys[0].1, RemovalCause::Expired);
+    }
+
+    #[test]
+    fn test_eviction_handler_on_get() {
+        let removed_keys = Arc::new(Mutex::new(Vec::new()));
+        let rk = removed_keys.clone();
+        let cache = Cache::builder()
+            .time_to_live(Duration::from_millis(250))
+            .eviction_handler(move |key: Arc<String>, _, cause| {
+                rk.lock().unwrap().push(((*key).clone(), cause));
+            })
+            .build();
+        let (clock, mock) = Clock::mock();
+        cache.set_expiration_clock(Some(clock));
+        cache.insert("Foo".to_owned(), "Bar".to_owned());
+
+        mock.increment(Duration::from_millis(250));
+        let res = cache.get(&"Foo".to_owned());
+        assert!(res.is_none());
+        let keys = removed_keys.lock().unwrap();
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0].0, "Foo");
+        assert_eq!(keys[0].1, RemovalCause::Expired);
     }
 }

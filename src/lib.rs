@@ -58,7 +58,7 @@
 //! latest stable. In both cases, increasing MSRV is _not_ considered a
 //! semver-breaking change.
 
-pub(crate) mod common;
+pub mod common;
 pub(crate) mod policy;
 pub mod unsync;
 

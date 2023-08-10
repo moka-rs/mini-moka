@@ -20,6 +20,8 @@ default = ["sync"]
 
 sync = ["dashmap"]
 
+testing = []
+
 [dependencies]
 crossbeam-channel = "0.5.5"
 crossbeam-utils = "0.8"
