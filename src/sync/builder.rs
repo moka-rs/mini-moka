@@ -1,5 +1,5 @@
 use super::Cache;
-use crate::sync::{cache::DefaultEvictionHandler, EvictionHandler};
+use crate::sync::{default_eviction_handler, EvictionHandler, RemovalCause};
 
 use crate::{common::builder_utils, common::concurrent::Weigher};
 
@@ -49,7 +49,7 @@ pub struct CacheBuilder<K, V, C> {
     time_to_live: Option<Duration>,
     time_to_idle: Option<Duration>,
     cache_type: PhantomData<C>,
-    eviction_handler: Option<Box<dyn EvictionHandler<K, V>>>,
+    eviction_handler: Option<EvictionHandler<K, V>>,
 }
 
 impl<K, V> Default for CacheBuilder<K, V, Cache<K, V, RandomState>>
@@ -99,7 +99,7 @@ where
         builder_utils::ensure_expirations_or_panic(self.time_to_live, self.time_to_idle);
         let eviction_handler = self
             .eviction_handler
-            .unwrap_or_else(|| Box::new(DefaultEvictionHandler::new()));
+            .unwrap_or_else(default_eviction_handler);
         Cache::with_everything(
             self.max_capacity,
             self.initial_capacity,
@@ -128,7 +128,7 @@ where
         builder_utils::ensure_expirations_or_panic(self.time_to_live, self.time_to_idle);
         let eviction_handler = self
             .eviction_handler
-            .unwrap_or_else(|| Box::new(DefaultEvictionHandler::new()));
+            .unwrap_or_else(default_eviction_handler);
         Cache::with_everything(
             self.max_capacity,
             self.initial_capacity,
@@ -141,11 +141,7 @@ where
     }
 }
 
-impl<K, V, C> CacheBuilder<K, V, C>
-where
-    K: Send + Sync,
-    V: Send + Sync,
-{
+impl<K, V, C> CacheBuilder<K, V, C> {
     /// Sets the max capacity of the cache.
     pub fn max_capacity(self, max_capacity: u64) -> Self {
         Self {
@@ -190,10 +186,13 @@ where
         }
     }
 
-    /// Sets the eviction handler
-    pub fn eviction_handler(self, eviction_handler: impl EvictionHandler<K, V> + 'static) -> Self {
+    /// Sets the eviction handler. It will be called when an entry is evicted from the cache.
+    pub fn eviction_handler(
+        self,
+        eviction_handler: impl Fn(Arc<K>, &V, RemovalCause) + Send + Sync + 'static,
+    ) -> Self {
         Self {
-            eviction_handler: Some(Box::new(eviction_handler)),
+            eviction_handler: Some(Arc::new(eviction_handler)),
             ..self
         }
     }

@@ -10,6 +10,7 @@ use crate::{
         },
         time::Instant,
     },
+    sync::default_eviction_handler,
     Policy,
 };
 
@@ -19,7 +20,6 @@ use std::{
     collections::hash_map::RandomState,
     fmt,
     hash::{BuildHasher, Hash},
-    marker::PhantomData,
     sync::Arc,
     time::Duration,
 };
@@ -300,7 +300,7 @@ where
             None,
             None,
             None,
-            Box::new(DefaultEvictionHandler::new()),
+            default_eviction_handler(),
         )
     }
 
@@ -385,7 +385,7 @@ where
         weigher: Option<Weigher<K, V>>,
         time_to_live: Option<Duration>,
         time_to_idle: Option<Duration>,
-        eviction_handler: Box<dyn EvictionHandler<K, V>>,
+        eviction_handler: EvictionHandler<K, V>,
     ) -> Self {
         Self {
             base: BaseCache::new(
@@ -659,32 +659,12 @@ where
         self.base.set_expiration_clock(clock);
     }
 }
-pub(crate) struct DefaultEvictionHandler<K, V> {
-    pk: PhantomData<K>,
-    pv: PhantomData<V>,
-}
-
-impl<K, V> EvictionHandler<K, V> for DefaultEvictionHandler<K, V>
-where
-    K: Send + Sync,
-    V: Send + Sync,
-{
-}
-
-impl<K, V> DefaultEvictionHandler<K, V> {
-    pub(crate) fn new() -> Self {
-        DefaultEvictionHandler {
-            pk: PhantomData {},
-            pv: PhantomData {},
-        }
-    }
-}
 
 // To see the debug prints, run test as `cargo test -- --nocapture`
 #[cfg(test)]
 mod tests {
-    use super::{Cache, ConcurrentCacheExt, EvictionHandler};
-    use crate::common::time::Clock;
+    use super::{Cache, ConcurrentCacheExt};
+    use crate::{common::time::Clock, sync::RemovalCause};
 
     use std::{
         sync::{Arc, Mutex},
@@ -1215,29 +1195,15 @@ mod tests {
         assert_eq!(result[1], 5);
     }
 
-    struct TestEvictionHandler {
-        removed_keys: Arc<Mutex<Vec<String>>>,
-    }
-
-    impl TestEvictionHandler {
-        fn new(removed_keys: Arc<Mutex<Vec<String>>>) -> Self {
-            TestEvictionHandler { removed_keys }
-        }
-    }
-
-    impl EvictionHandler<String, String> for TestEvictionHandler {
-        fn on_remove(&self, k: Arc<String>, _: &String) {
-            self.removed_keys.lock().unwrap().push((*k).clone())
-        }
-    }
-
     #[test]
     fn test_eviction_handler_on_ttl() {
         let removed_keys = Arc::new(Mutex::new(Vec::new()));
-        let handler = TestEvictionHandler::new(removed_keys.clone());
-        let cache = Cache::builder()
+        let rk = removed_keys.clone();
+        let cache: Cache<String, String> = Cache::builder()
             .time_to_live(Duration::from_millis(250))
-            .eviction_handler(handler)
+            .eviction_handler(move |key: Arc<String>, _, cause| {
+                rk.lock().unwrap().push(((*key).clone(), cause));
+            })
             .build();
         let (clock, mock) = Clock::mock();
         cache.set_expiration_clock(Some(clock));
@@ -1247,16 +1213,19 @@ mod tests {
         cache.sync();
         let keys = removed_keys.lock().unwrap();
         assert_eq!(keys.len(), 1);
-        assert_eq!(keys[0], "Foo");
+        assert_eq!(keys[0].0, "Foo");
+        assert_eq!(keys[0].1, RemovalCause::Expired);
     }
 
     #[test]
     fn test_eviction_handler_on_tti() {
         let removed_keys = Arc::new(Mutex::new(Vec::new()));
-        let handler = TestEvictionHandler::new(removed_keys.clone());
+        let rk = removed_keys.clone();
         let cache = Cache::builder()
             .time_to_idle(Duration::from_millis(250))
-            .eviction_handler(handler)
+            .eviction_handler(move |key: Arc<String>, _, cause| {
+                rk.lock().unwrap().push(((*key).clone(), cause));
+            })
             .build();
         let (clock, mock) = Clock::mock();
         cache.set_expiration_clock(Some(clock));
@@ -1265,16 +1234,19 @@ mod tests {
         cache.sync();
         let keys = removed_keys.lock().unwrap();
         assert_eq!(keys.len(), 1);
-        assert_eq!(keys[0], "Foo");
+        assert_eq!(keys[0].0, "Foo");
+        assert_eq!(keys[0].1, RemovalCause::Expired);
     }
 
     #[test]
     fn test_eviction_handler_on_get() {
         let removed_keys = Arc::new(Mutex::new(Vec::new()));
-        let handler = TestEvictionHandler::new(removed_keys.clone());
+        let rk = removed_keys.clone();
         let cache = Cache::builder()
             .time_to_live(Duration::from_millis(250))
-            .eviction_handler(handler)
+            .eviction_handler(move |key: Arc<String>, _, cause| {
+                rk.lock().unwrap().push(((*key).clone(), cause));
+            })
             .build();
         let (clock, mock) = Clock::mock();
         cache.set_expiration_clock(Some(clock));
@@ -1285,6 +1257,7 @@ mod tests {
         assert!(res.is_none());
         let keys = removed_keys.lock().unwrap();
         assert_eq!(keys.len(), 1);
-        assert_eq!(keys[0], "Foo");
+        assert_eq!(keys[0].0, "Foo");
+        assert_eq!(keys[0].1, RemovalCause::Expired);
     }
 }

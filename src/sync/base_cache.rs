@@ -19,6 +19,7 @@ use crate::{
         CacheRegion,
     },
     sync::EvictionHandler,
+    sync::RemovalCause,
     Policy,
 };
 
@@ -95,7 +96,7 @@ where
         weigher: Option<Weigher<K, V>>,
         time_to_live: Option<Duration>,
         time_to_idle: Option<Duration>,
-        eviction_handler: Box<dyn EvictionHandler<K, V>>,
+        eviction_handler: EvictionHandler<K, V>,
     ) -> Self {
         let (r_snd, r_rcv) = crossbeam_channel::bounded(READ_LOG_SIZE);
         let (w_snd, w_rcv) = crossbeam_channel::bounded(WRITE_LOG_SIZE);
@@ -494,7 +495,7 @@ pub(crate) struct Inner<K, V, S> {
     weigher: Option<Weigher<K, V>>,
     has_expiration_clock: AtomicBool,
     expiration_clock: RwLock<Option<Clock>>,
-    eviction_handler: RwLock<Box<dyn EvictionHandler<K, V>>>,
+    eviction_handler: EvictionHandler<K, V>,
 }
 
 // functions/methods used by BaseCache
@@ -516,7 +517,7 @@ where
         write_op_ch: Receiver<WriteOp<K, V>>,
         time_to_live: Option<Duration>,
         time_to_idle: Option<Duration>,
-        eviction_handler: Box<dyn EvictionHandler<K, V>>,
+        eviction_handler: EvictionHandler<K, V>,
     ) -> Self {
         let initial_capacity = initial_capacity
             .map(|cap| cap + WRITE_LOG_SIZE)
@@ -524,7 +525,6 @@ where
         let cache =
             dashmap::DashMap::with_capacity_and_hasher(initial_capacity, build_hasher.clone());
 
-        let eviction_handler = RwLock::new(eviction_handler);
         Self {
             max_capacity,
             entry_count: Default::default(),
@@ -558,12 +558,13 @@ where
     }
 
     #[inline]
-    pub(crate) fn remove(&self, k: &K) -> Option<(Arc<K>, TrioArc<ValueEntry<K, V>>)> {
+    pub(crate) fn remove(
+        &self,
+        k: &K,
+        cause: RemovalCause,
+    ) -> Option<(Arc<K>, TrioArc<ValueEntry<K, V>>)> {
         self.cache.remove(k).map(|(k, v)| {
-            self.eviction_handler
-                .read()
-                .unwrap()
-                .on_remove(k.clone(), &v.value);
+            (self.eviction_handler)(k.clone(), &v.value, cause);
             (k, v)
         })
     }
@@ -572,13 +573,11 @@ where
     pub(crate) fn remove_if(
         &self,
         k: &K,
+        cause: RemovalCause,
         f: impl FnOnce(&Arc<K>, &TrioArc<ValueEntry<K, V>>) -> bool,
     ) -> Option<(Arc<K>, TrioArc<ValueEntry<K, V>>)> {
         self.cache.remove_if(k, f).map(|(k, v)| {
-            self.eviction_handler
-                .read()
-                .unwrap()
-                .on_remove(k.clone(), &v.value);
+            (self.eviction_handler)(k.clone(), &v.value, cause);
             (k, v)
         })
     }
@@ -599,10 +598,7 @@ where
         Q: Hash + Eq + ?Sized,
     {
         self.cache.remove(key).map(|(key, entry)| {
-            self.eviction_handler
-                .read()
-                .unwrap()
-                .on_remove(key.clone(), &entry.value);
+            (self.eviction_handler)(key.clone(), &entry.value, RemovalCause::Explicit);
             KvEntry::new(key, entry)
         })
     }
@@ -895,8 +891,8 @@ where
         if let Some(max) = self.max_capacity {
             if new_weight as u64 > max {
                 // The candidate is too big to fit in the cache. Reject it.
-                self.remove(&Arc::clone(&kh.key))
-                    .map(|(k, v)| self.eviction_handler.read().unwrap().on_remove(k, &v.value));
+                self.remove(&Arc::clone(&kh.key), RemovalCause::Size)
+                    .map(|(k, v)| (self.eviction_handler)(k, &v.value, RemovalCause::Size));
                 return;
             }
         }
@@ -914,7 +910,7 @@ where
                 // Try to remove the victims from the cache (hash map).
                 for victim in victim_nodes {
                     if let Some((_vic_key, vic_entry)) =
-                        self.remove(unsafe { victim.as_ref().element.key() })
+                        self.remove(unsafe { victim.as_ref().element.key() }, RemovalCause::Size)
                     {
                         // And then remove the victim from the deques.
                         Self::handle_remove(deqs, vic_entry, counters);
@@ -933,7 +929,7 @@ where
             AdmissionResult::Rejected { skipped_nodes: s } => {
                 skipped_nodes = s;
                 // Remove the candidate from the cache (hash map).
-                self.remove(&Arc::clone(&kh.key));
+                self.remove(&Arc::clone(&kh.key), RemovalCause::Size);
             }
         };
 
@@ -1140,7 +1136,9 @@ where
             // expired. This check is needed because it is possible that the entry in
             // the map has been updated or deleted but its deque node we checked
             // above have not been updated yet.
-            let maybe_entry = self.remove_if(key, |_, v| is_expired_entry_ao(tti, va, v, now));
+            let maybe_entry = self.remove_if(key, RemovalCause::Expired, |_, v| {
+                is_expired_entry_ao(tti, va, v, now)
+            });
 
             if let Some((_k, entry)) = maybe_entry {
                 Self::handle_remove_with_deques(deq_name, deq, write_order_deq, entry, counters);
@@ -1204,7 +1202,9 @@ where
 
             let key = key.as_ref().unwrap();
 
-            let maybe_entry = self.remove_if(key, |_, v| is_expired_entry_wo(ttl, va, v, now));
+            let maybe_entry = self.remove_if(key, RemovalCause::Expired, |_, v| {
+                is_expired_entry_wo(ttl, va, v, now)
+            });
 
             if let Some((_k, entry)) = maybe_entry {
                 Self::handle_remove(deqs, entry, counters);
@@ -1266,7 +1266,7 @@ where
                 None => break,
             };
 
-            let maybe_entry = self.remove_if(&key, |_, v| {
+            let maybe_entry = self.remove_if(&key, RemovalCause::Expired, |_, v| {
                 if let Some(lm) = v.last_modified() {
                     lm == ts
                 } else {
@@ -1360,7 +1360,7 @@ fn is_expired_entry_wo(
 #[cfg(test)]
 mod tests {
     use super::BaseCache;
-    use crate::sync::cache::DefaultEvictionHandler;
+    use crate::sync::default_eviction_handler;
 
     #[cfg_attr(target_pointer_width = "16", ignore)]
     #[test]
@@ -1378,7 +1378,7 @@ mod tests {
                 None,
                 None,
                 None,
-                Box::new(DefaultEvictionHandler::new()),
+                default_eviction_handler(),
             );
             cache.inner.enable_frequency_sketch_for_testing();
             assert_eq!(
