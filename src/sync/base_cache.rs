@@ -478,6 +478,9 @@ type CacheStore<K, V, S> = dashmap::DashMap<Arc<K>, TrioArc<ValueEntry<K, V>>, S
 
 type CacheEntryRef<'a, K, V, S> = DashMapRef<'a, Arc<K>, TrioArc<ValueEntry<K, V>>, S>;
 
+// Define a type alias to avoid clippy::type_complexity warnings.
+type RemovedEntry<K, V> = (Arc<K>, TrioArc<ValueEntry<K, V>>);
+
 pub(crate) struct Inner<K, V, S> {
     max_capacity: Option<u64>,
     entry_count: AtomicCell<u64>,
@@ -558,11 +561,7 @@ where
     }
 
     #[inline]
-    pub(crate) fn remove(
-        &self,
-        k: &K,
-        cause: RemovalCause,
-    ) -> Option<(Arc<K>, TrioArc<ValueEntry<K, V>>)> {
+    pub(crate) fn remove(&self, k: &K, cause: RemovalCause) -> Option<RemovedEntry<K, V>> {
         self.cache.remove(k).map(|(k, v)| {
             (self.eviction_handler)(k.clone(), &v.value, cause);
             (k, v)
@@ -575,7 +574,7 @@ where
         k: &K,
         cause: RemovalCause,
         f: impl FnOnce(&Arc<K>, &TrioArc<ValueEntry<K, V>>) -> bool,
-    ) -> Option<(Arc<K>, TrioArc<ValueEntry<K, V>>)> {
+    ) -> Option<RemovedEntry<K, V>> {
         self.cache.remove_if(k, f).map(|(k, v)| {
             (self.eviction_handler)(k.clone(), &v.value, cause);
             (k, v)
@@ -891,8 +890,9 @@ where
         if let Some(max) = self.max_capacity {
             if new_weight as u64 > max {
                 // The candidate is too big to fit in the cache. Reject it.
-                self.remove(&Arc::clone(&kh.key), RemovalCause::Size)
-                    .map(|(k, v)| (self.eviction_handler)(k, &v.value, RemovalCause::Size));
+                if let Some((k, v)) = self.remove(&Arc::clone(&kh.key), RemovalCause::Size) {
+                    (self.eviction_handler)(k, &v.value, RemovalCause::Size)
+                }
                 return;
             }
         }
