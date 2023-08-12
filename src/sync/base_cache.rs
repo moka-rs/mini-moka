@@ -775,7 +775,9 @@ where
                 Ok(Hit(hash, entry, timestamp)) => {
                     freq.increment(hash);
                     entry.set_last_accessed(timestamp);
-                    deqs.move_to_back_ao(&entry)
+                    if entry.is_admitted() {
+                        deqs.move_to_back_ao(&entry);
+                    }
                 }
                 Ok(Miss(hash)) => freq.increment(hash),
                 Err(_) => break,
