@@ -1,5 +1,13 @@
 # Mini Moka Cache &mdash; Change Log
 
+## Version 0.10.2
+
+### Fixed
+
+- Fixed a memory corruption bug caused by the timing of concurrent `insert`,
+  `get` and removal of the same cached entry. ([#15][gh-pull-0015]).
+
+
 ## Version 0.10.1
 
 Bumped the minimum supported Rust version (MSRV) to 1.61 (May 19, 2022).
@@ -45,6 +53,7 @@ lightweight.
 <!-- Links -->
 [moka-v0.9.6]: https://github.com/moka-rs/moka/tree/v0.9.6
 
+[gh-pull-0015]: https://github.com/moka-rs/mini-moka/pull/15/
 [gh-pull-0006]: https://github.com/moka-rs/mini-moka/pull/6/
 [gh-pull-0005]: https://github.com/moka-rs/mini-moka/pull/5/
 [gh-pull-0002]: https://github.com/moka-rs/mini-moka/pull/2/
