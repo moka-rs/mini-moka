@@ -21,42 +21,47 @@ jobs:
   linux-cross:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         platform:
           - target: aarch64-unknown-linux-musl
+            rust-version: stable
           - target: i686-unknown-linux-musl
+            rust-version: stable
           - target: armv7-unknown-linux-musleabihf
+            rust-version: stable
           - target: armv5te-unknown-linux-musleabi
+            rust-version: stable
           - target: mips-unknown-linux-musl
+            rust-version: "1.72.1"
+            cargo-version: "+1.72.1"
           - target: mipsel-unknown-linux-musl
+            rust-version: "1.72.1"
+            cargo-version: "+1.72.1"
 
     steps:
-      - name: Checkout Moka
-        uses: actions/checkout@v2
+      - name: Checkout Mini Moka
+        uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
-          toolchain: stable
-          target: ${{ matrix.platform.target }}
-          override: true
+          toolchain: ${{ matrix.platform.rust-version }}
+          targets: ${{ matrix.platform.target }}
+
+      - name: Install cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
 
       - name: Remove integration tests and force enable rustc_version crate
         run: |
           rm -rf tests
           sed -i '/actix-rt\|async-std\|reqwest\|skeptic/d' Cargo.toml
 
-      - uses: Swatinem/rust-cache@v1
-
-      - name: cargo clean
-        uses: actions-rs/cargo@v1
-        with:
-          command: clean
+      - run: cargo clean
 
       - name: Run tests (sync feature)
-        uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: test
-          args: --release --features sync --target ${{ matrix.platform.target }}
+        run: |
+          cross ${{ matrix.platform.carge-version }} test --release -F sync \
+            --target ${{ matrix.platform.target }}
