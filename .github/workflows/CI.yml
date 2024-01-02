@@ -19,6 +19,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         rust:
           - stable
@@ -28,47 +29,28 @@ jobs:
 
     steps:
       - name: Checkout Mini Moka
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: ${{ matrix.rust }}
-          override: true
-          components: rustfmt, clippy
 
-      - uses: Swatinem/rust-cache@v1
-
-      - name: cargo clean
-        uses: actions-rs/cargo@v1
-        with:
-          command: clean
+      - run: cargo clean
 
       - name: Downgrade dependencies to minimal versions (Nightly only)
-        uses: actions-rs/cargo@v1
         if: ${{ matrix.rust == 'nightly' }}
-        with:
-          command: update
-          args: -Z minimal-versions
+        run: cargo update -Z minimal-versions
 
       - name: Pin some dependencies to specific versions (MSRV only)
         if: ${{ matrix.rust == '1.61.0' }}
         run: ./.ci_extras/pin-crate-vers-msrv.sh
 
       - name: Show cargo tree
-        uses: actions-rs/cargo@v1
-        with:
-          command: tree
+        run: cargo tree
 
       - name: Run tests (debug, sync feature)
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --features sync
+        run: cargo test --features sync
 
       - name: Run tests (release, sync feature)
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --release --features sync
+        run: cargo test --release --features sync
