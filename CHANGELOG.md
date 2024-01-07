@@ -1,5 +1,13 @@
 # Mini Moka Cache &mdash; Change Log
 
+## Version 0.10.3
+
+### Fixed
+
+- Fixed occasional panic in internal `FrequencySketch` in debug build.
+  ([#21][gh-issue-0021])
+
+
 ## Version 0.10.2
 
 ### Fixed
@@ -52,6 +60,8 @@ lightweight.
 
 <!-- Links -->
 [moka-v0.9.6]: https://github.com/moka-rs/moka/tree/v0.9.6
+
+[gh-issue-0021]: https://github.com/moka-rs/mini-moka/issues/21/
 
 [gh-pull-0015]: https://github.com/moka-rs/mini-moka/pull/15/
 [gh-pull-0006]: https://github.com/moka-rs/mini-moka/pull/6/
