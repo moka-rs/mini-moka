@@ -1,0 +1,28 @@
+name: Kani CI
+
+on:
+  pull_request:
+    paths-ignore:
+      - '.vscode/**'
+      - CHANGELOG.md
+      - README.md
+  push:
+    paths-ignore:
+      - '.vscode/**'
+      - CHANGELOG.md
+      - README.md
+
+jobs:
+  run-kani:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Moka
+        uses: actions/checkout@v4
+
+      - name: Show CPU into
+        run: |
+          nproc
+          lscpu
+          free -m
+      - name: Run Kani
+        uses: model-checking/kani-github-action@v1.0
