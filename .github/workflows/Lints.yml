@@ -33,10 +33,7 @@ jobs:
       - run: cargo clean
 
       - name: Run Clippy
-        uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --lib --tests --all-features --all-targets -- -D warnings
+        run: cargo clippy --lib --tests --all-features --all-targets -- -D warnings
         env:
           RUSTFLAGS: ${{ matrix.rust.rustflags }}
 

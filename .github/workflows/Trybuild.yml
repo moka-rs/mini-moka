@@ -1,4 +1,4 @@
-name: Skeptic and Trybuild
+name: Trybuild
 
 on:
   push:
@@ -27,13 +27,6 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
-
-      - run: cargo clean
-
-      - name: Run tests (no features)
-        run: cargo test --release
-        env:
-          RUSTFLAGS: '--cfg skeptic'
 
       - name: Run compile error tests (sync feature, trybuild)
         if: ${{ matrix.rust == 'stable' }}

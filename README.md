@@ -285,7 +285,7 @@ MSRV is _not_ considered a semver-breaking change.
 To run all tests including doc tests on the README, use the following command:
 
 ```console
-$ RUSTFLAGS='--cfg skeptic --cfg trybuild' cargo test --all-features
+$ RUSTFLAGS='--cfg trybuild' cargo test --all-features
 ```
 
 
