@@ -1,0 +1,39 @@
+name: Codecov
+
+on:
+  pull_request:
+    paths-ignore:
+    - '.devcontainer/**'
+    - '.gitpod.yml'
+    - '.vscode/**'
+
+jobs:
+  codecov:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Mini Moka
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - run: cargo clean
+
+      - name: Show cargo tree
+        run: cargo tree
+
+      - name: Run tests (debug, sync feature)
+        run: cargo llvm-cov --features sync --lcov --output-path lcov.info
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          fail_ci_if_error: true
+          files: ./lcov.info
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
