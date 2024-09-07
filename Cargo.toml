@@ -46,3 +46,12 @@ trybuild = "1.0"
 # Build the doc with some features enabled.
 features = []
 rustdoc-args = ["--cfg", "docsrs"]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+    "cfg(kani)",
+    "cfg(skeptic)",
+    "cfg(circleci)",
+    "cfg(trybuild)",
+    "cfg(beta_clippy)",
+] }
