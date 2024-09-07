@@ -554,7 +554,7 @@ where
     V: 'a,
     S: BuildHasher + Clone,
 {
-    type Item = EntryRef<'a, K, V, S>;
+    type Item = EntryRef<'a, K, V>;
 
     type IntoIter = Iter<'a, K, V, S>;
 

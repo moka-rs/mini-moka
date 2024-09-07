@@ -450,7 +450,7 @@ enum AdmissionResult<K> {
 
 type CacheStore<K, V, S> = dashmap::DashMap<Arc<K>, TrioArc<ValueEntry<K, V>>, S>;
 
-type CacheEntryRef<'a, K, V, S> = DashMapRef<'a, Arc<K>, TrioArc<ValueEntry<K, V>>, S>;
+type CacheEntryRef<'a, K, V> = DashMapRef<'a, Arc<K>, TrioArc<ValueEntry<K, V>>>;
 
 pub(crate) struct Inner<K, V, S> {
     max_capacity: Option<u64>,
@@ -529,7 +529,7 @@ where
     }
 
     #[inline]
-    fn get<Q>(&self, key: &Q) -> Option<CacheEntryRef<'_, K, V, S>>
+    fn get<Q>(&self, key: &Q) -> Option<CacheEntryRef<'_, K, V>>
     where
         Arc<K>: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
