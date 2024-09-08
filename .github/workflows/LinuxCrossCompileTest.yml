@@ -32,12 +32,6 @@ jobs:
             rust-version: stable
           - target: armv5te-unknown-linux-musleabi
             rust-version: stable
-          - target: mips-unknown-linux-musl
-            rust-version: "1.76"
-            cargo-version: "+1.76"
-          - target: mipsel-unknown-linux-musl
-            rust-version: "1.76"
-            cargo-version: "+1.76"
 
     steps:
       - name: Checkout Mini Moka
