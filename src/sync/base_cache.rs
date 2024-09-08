@@ -477,7 +477,7 @@ enum AdmissionResult<K> {
 
 type CacheStore<K, V, S> = dashmap::DashMap<Arc<K>, TrioArc<ValueEntry<K, V>>, S>;
 
-type CacheEntryRef<'a, K, V, S> = DashMapRef<'a, Arc<K>, TrioArc<ValueEntry<K, V>>, S>;
+type CacheEntryRef<'a, K, V> = DashMapRef<'a, Arc<K>, TrioArc<ValueEntry<K, V>>>;
 
 // Define a type alias to avoid clippy::type_complexity warnings.
 type RemovedEntry<K, V> = (Arc<K>, TrioArc<ValueEntry<K, V>>);
@@ -583,7 +583,7 @@ where
     }
 
     #[inline]
-    fn get<Q>(&self, key: &Q) -> Option<CacheEntryRef<'_, K, V, S>>
+    fn get<Q>(&self, key: &Q) -> Option<CacheEntryRef<'_, K, V>>
     where
         Arc<K>: Borrow<Q>,
         Q: Hash + Eq + ?Sized,

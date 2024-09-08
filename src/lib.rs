@@ -51,7 +51,7 @@
 //!
 //! | Feature          | MSRV                       |
 //! |:-----------------|:--------------------------:|
-//! | default features | Rust 1.61.0 (May 19, 2022) |
+//! | default features | Rust 1.76.0 (Feb 8, 2024) |
 //!
 //! If only the default features are enabled, MSRV will be updated conservatively.
 //! When using other features, MSRV might be updated more frequently, up to the

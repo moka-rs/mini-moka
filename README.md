@@ -270,7 +270,7 @@ Mini Moka's minimum supported Rust versions (MSRV) are the followings:
 
 | Feature          | MSRV                       |
 |:-----------------|:--------------------------:|
-| default features | Rust 1.61.0 (May 19, 2022) |
+| default features | Rust 1.76.0 (Feb 8, 2024)  |
 
 It will keep a rolling MSRV policy of at least 6 months. If only the default features
 are enabled, MSRV will be updated conservatively. When using other features, MSRV

@@ -2,7 +2,7 @@
 name = "mini-moka"
 version = "0.10.3"
 edition = "2018"
-rust-version = "1.61"
+rust-version = "1.76"
 
 description = "A lighter edition of Moka, a fast and concurrent cache library"
 license = "MIT OR Apache-2.0"
@@ -29,11 +29,10 @@ tagptr = "0.2"
 
 # Opt-out serde and stable_deref_trait features
 # https://github.com/Manishearth/triomphe/pull/5
-# 0.1.12 requires Rust 1.76
-triomphe = { version = ">=0.1.3, <0.1.12", default-features = false }
+triomphe = { version = "0.1.13", default-features = false }
 
 # Optional dependencies (enabled by default)
-dashmap = { version = "5.2", optional = true }
+dashmap = { version = "6.1", optional = true }
 
 [dev-dependencies]
 anyhow = "1.0.19"
