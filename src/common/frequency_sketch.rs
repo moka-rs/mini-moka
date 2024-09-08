@@ -17,7 +17,7 @@
 #[derive(Default)]
 pub(crate) struct FrequencySketch {
     sample_size: u32,
-    table_mask: u64,
+    table_mask: u32,
     table: Box<[u64]>,
     size: u32,
 }
@@ -101,7 +101,7 @@ impl FrequencySketch {
         }
 
         self.table = vec![0; table_size as usize].into_boxed_slice();
-        self.table_mask = 0.max(table_size - 1) as u64;
+        self.table_mask = table_size - 1;
         self.sample_size = if cap == 0 {
             10
         } else {
@@ -181,7 +181,7 @@ impl FrequencySketch {
         let i = depth as usize;
         let mut hash = hash.wrapping_add(SEED[i]).wrapping_mul(SEED[i]);
         hash = hash.wrapping_add(hash >> 32);
-        (hash & self.table_mask) as usize
+        (hash & (self.table_mask as u64)) as usize
     }
 }
 
