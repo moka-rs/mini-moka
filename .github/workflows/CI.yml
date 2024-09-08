@@ -24,7 +24,7 @@ jobs:
         rust:
           - stable
           - beta
-          - 1.61.0  # MSRV
+          - 1.76.0  # MSRV
           - nightly # For checking minimum version dependencies.
 
     steps:
@@ -41,10 +41,6 @@ jobs:
       - name: Downgrade dependencies to minimal versions (Nightly only)
         if: ${{ matrix.rust == 'nightly' }}
         run: cargo update -Z minimal-versions
-
-      - name: Pin some dependencies to specific versions (MSRV only)
-        if: ${{ matrix.rust == '1.61.0' }}
-        run: ./.ci_extras/pin-crate-vers-msrv.sh
 
       - name: Show cargo tree
         run: cargo tree

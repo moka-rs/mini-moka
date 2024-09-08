@@ -3,19 +3,19 @@ name: Linux cross compile tests
 on:
   push:
     paths-ignore:
-    - '.devcontainer/**'
-    - '.gitpod.yml'
-    - '.vscode/**'
-    - 'tests/**'
+      - ".devcontainer/**"
+      - ".gitpod.yml"
+      - ".vscode/**"
+      - "tests/**"
   pull_request:
     paths-ignore:
-    - '.devcontainer/**'
-    - '.gitpod.yml'
-    - '.vscode/**'
-    - 'tests/**'
+      - ".devcontainer/**"
+      - ".gitpod.yml"
+      - ".vscode/**"
+      - "tests/**"
   schedule:
     # Run against the last commit on the default branch on Friday at 9pm (UTC?)
-    - cron:  '0 21 * * 5'
+    - cron: "0 21 * * 5"
 
 jobs:
   linux-cross:
@@ -33,11 +33,11 @@ jobs:
           - target: armv5te-unknown-linux-musleabi
             rust-version: stable
           - target: mips-unknown-linux-musl
-            rust-version: "1.72.1"
-            cargo-version: "+1.72.1"
+            rust-version: "1.76"
+            cargo-version: "+1.76"
           - target: mipsel-unknown-linux-musl
-            rust-version: "1.72.1"
-            cargo-version: "+1.72.1"
+            rust-version: "1.76"
+            cargo-version: "+1.76"
 
     steps:
       - name: Checkout Mini Moka
