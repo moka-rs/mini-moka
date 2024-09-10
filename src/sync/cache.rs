@@ -224,6 +224,7 @@ use std::{
 /// [build-with-hasher-method]: ./struct.CacheBuilder.html#method.build_with_hasher
 /// [ahash-crate]: https://crates.io/crates/ahash
 ///
+#[cfg_attr(feature = "typesize", derive(typesize::derive::TypeSize))]
 pub struct Cache<K, V, S = RandomState> {
     base: BaseCache<K, V, S>,
 }
@@ -443,15 +444,9 @@ where
 
     pub(crate) fn insert_with_hash(&self, key: Arc<K>, hash: u64, value: V) {
         let (op, now) = self.base.do_insert_with_hash(key, hash, value);
-        let hk = self.base.housekeeper.as_ref();
-        Self::schedule_write_op(
-            self.base.inner.as_ref(),
-            &self.base.write_op_ch,
-            op,
-            now,
-            hk,
-        )
-        .expect("Failed to insert");
+        let hk = self.base.housekeeper.as_deref();
+        Self::schedule_write_op(&*self.base.inner, &self.base.write_op_ch, op, now, hk)
+            .expect("Failed to insert");
     }
 
     /// Discards any cached value for the key.
@@ -466,15 +461,9 @@ where
         if let Some(kv) = self.base.remove_entry(key) {
             let op = WriteOp::Remove(kv);
             let now = self.base.current_time_from_expiration_clock();
-            let hk = self.base.housekeeper.as_ref();
-            Self::schedule_write_op(
-                self.base.inner.as_ref(),
-                &self.base.write_op_ch,
-                op,
-                now,
-                hk,
-            )
-            .expect("Failed to remove");
+            let hk = self.base.housekeeper.as_deref();
+            Self::schedule_write_op(&*self.base.inner, &self.base.write_op_ch, op, now, hk)
+                .expect("Failed to remove");
         }
     }
 
@@ -576,7 +565,7 @@ where
         ch: &Sender<WriteOp<K, V>>,
         op: WriteOp<K, V>,
         now: Instant,
-        housekeeper: Option<&Arc<Housekeeper>>,
+        housekeeper: Option<&Housekeeper>,
     ) -> Result<(), TrySendError<WriteOp<K, V>>> {
         let mut op = op;
 

@@ -16,6 +16,7 @@ use crate::{
         deque::{DeqNode, Deque},
         frequency_sketch::FrequencySketch,
         time::{CheckedTimeOps, Clock, Instant},
+        typesize_helpers::MaybeOwnedArc,
         CacheRegion,
     },
     Policy,
@@ -38,11 +39,14 @@ use std::{
 };
 use triomphe::Arc as TrioArc;
 
+#[cfg_attr(feature = "typesize", derive(typesize::derive::TypeSize))]
 pub(crate) struct BaseCache<K, V, S = RandomState> {
-    pub(crate) inner: Arc<Inner<K, V, S>>,
+    pub(crate) inner: MaybeOwnedArc<Inner<K, V, S>>,
+    #[typesize(skip)]
     read_op_ch: Sender<ReadOp<K, V>>,
+    #[typesize(skip)]
     pub(crate) write_op_ch: Sender<WriteOp<K, V>>,
-    pub(crate) housekeeper: Option<Arc<Housekeeper>>,
+    pub(crate) housekeeper: Option<MaybeOwnedArc<Housekeeper>>,
 }
 
 impl<K, V, S> Clone for BaseCache<K, V, S> {
@@ -52,7 +56,7 @@ impl<K, V, S> Clone for BaseCache<K, V, S> {
     /// pointers to the shared internal data structures.
     fn clone(&self) -> Self {
         Self {
-            inner: Arc::clone(&self.inner),
+            inner: MaybeOwnedArc::clone(&self.inner),
             read_op_ch: self.read_op_ch.clone(),
             write_op_ch: self.write_op_ch.clone(),
             housekeeper: self.housekeeper.clone(),
@@ -110,10 +114,10 @@ where
         );
         Self {
             #[cfg_attr(beta_clippy, allow(clippy::arc_with_non_send_sync))]
-            inner: Arc::new(inner),
+            inner: MaybeOwnedArc::new(inner),
             read_op_ch: r_snd,
             write_op_ch: w_snd,
-            housekeeper: Some(Arc::new(Housekeeper::default())),
+            housekeeper: Some(MaybeOwnedArc::new(Housekeeper::default())),
         }
     }
 
@@ -202,7 +206,7 @@ where
         inner: &impl InnerSync,
         ch: &Sender<WriteOp<K, V>>,
         now: Instant,
-        housekeeper: Option<&Arc<Housekeeper>>,
+        housekeeper: Option<&Housekeeper>,
     ) {
         let w_len = ch.len();
 
@@ -255,7 +259,7 @@ where
         op: ReadOp<K, V>,
         now: Instant,
     ) -> Result<(), TrySendError<ReadOp<K, V>>> {
-        self.apply_reads_if_needed(self.inner.as_ref(), now);
+        self.apply_reads_if_needed(&*self.inner, now);
         let ch = &self.read_op_ch;
         match ch.try_send(op) {
             // Discard the ReadOp when the channel is full.
@@ -452,9 +456,12 @@ type CacheStore<K, V, S> = dashmap::DashMap<Arc<K>, TrioArc<ValueEntry<K, V>>, S
 
 type CacheEntryRef<'a, K, V> = DashMapRef<'a, Arc<K>, TrioArc<ValueEntry<K, V>>>;
 
+#[cfg_attr(feature = "typesize", derive(typesize::derive::TypeSize))]
 pub(crate) struct Inner<K, V, S> {
     max_capacity: Option<u64>,
+    #[typesize(skip)]
     entry_count: AtomicCell<u64>,
+    #[typesize(skip)]
     weighted_size: AtomicCell<u64>,
     cache: CacheStore<K, V, S>,
     build_hasher: S,

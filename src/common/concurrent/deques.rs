@@ -7,6 +7,8 @@ use crate::common::{
 use std::ptr::NonNull;
 use tagptr::TagNonNull;
 use triomphe::Arc as TrioArc;
+
+#[cfg_attr(feature = "typesize", derive(typesize::derive::TypeSize))]
 pub(crate) struct Deques<K> {
     pub(crate) window: Deque<KeyHashDate<K>>, //    Not used yet.
     pub(crate) probation: Deque<KeyHashDate<K>>,
