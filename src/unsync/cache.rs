@@ -17,7 +17,7 @@ use std::{
     borrow::Borrow,
     collections::{hash_map::RandomState, HashMap},
     fmt,
-    hash::{BuildHasher, Hash, Hasher},
+    hash::{BuildHasher, Hash},
     ptr::NonNull,
     rc::Rc,
     time::Duration,
@@ -500,9 +500,7 @@ where
         Rc<K>: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
-        let mut hasher = self.build_hasher.build_hasher();
-        key.hash(&mut hasher);
-        hasher.finish()
+        self.build_hasher.hash_one(key)
     }
 
     #[inline]

@@ -28,7 +28,7 @@ use smallvec::SmallVec;
 use std::{
     borrow::Borrow,
     collections::hash_map::RandomState,
-    hash::{BuildHasher, Hash, Hasher},
+    hash::{BuildHasher, Hash},
     ptr::NonNull,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -523,9 +523,7 @@ where
         Arc<K>: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
-        let mut hasher = self.build_hasher.build_hasher();
-        key.hash(&mut hasher);
-        hasher.finish()
+        self.build_hasher.hash_one(key)
     }
 
     #[inline]
