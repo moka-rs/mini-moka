@@ -26,7 +26,7 @@ where
     K: Eq + Hash,
     S: BuildHasher + Clone,
 {
-    type Item = EntryRef<'a, K, V, S>;
+    type Item = EntryRef<'a, K, V>;
 
     fn next(&mut self) -> Option<Self::Item> {
         for map_ref in &mut self.map_iter {

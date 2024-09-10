@@ -28,7 +28,7 @@ use smallvec::SmallVec;
 use std::{
     borrow::Borrow,
     collections::hash_map::RandomState,
-    hash::{BuildHasher, Hash, Hasher},
+    hash::{BuildHasher, Hash},
     ptr::NonNull,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -450,7 +450,7 @@ enum AdmissionResult<K> {
 
 type CacheStore<K, V, S> = dashmap::DashMap<Arc<K>, TrioArc<ValueEntry<K, V>>, S>;
 
-type CacheEntryRef<'a, K, V, S> = DashMapRef<'a, Arc<K>, TrioArc<ValueEntry<K, V>>, S>;
+type CacheEntryRef<'a, K, V> = DashMapRef<'a, Arc<K>, TrioArc<ValueEntry<K, V>>>;
 
 pub(crate) struct Inner<K, V, S> {
     max_capacity: Option<u64>,
@@ -523,13 +523,11 @@ where
         Arc<K>: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
-        let mut hasher = self.build_hasher.build_hasher();
-        key.hash(&mut hasher);
-        hasher.finish()
+        self.build_hasher.hash_one(key)
     }
 
     #[inline]
-    fn get<Q>(&self, key: &Q) -> Option<CacheEntryRef<'_, K, V, S>>
+    fn get<Q>(&self, key: &Q) -> Option<CacheEntryRef<'_, K, V>>
     where
         Arc<K>: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
