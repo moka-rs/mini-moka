@@ -18,6 +18,7 @@ pub(crate) trait InnerSync {
     fn now(&self) -> Instant;
 }
 
+#[cfg_attr(feature = "typesize", derive(typesize::derive::TypeSize))]
 pub(crate) struct Housekeeper {
     is_sync_running: AtomicBool,
     sync_after: AtomicInstant,

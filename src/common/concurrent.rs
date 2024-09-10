@@ -13,6 +13,8 @@ pub(crate) mod atomic_time;
 
 use self::entry_info::EntryInfo;
 
+use super::typesize_helpers::MaybeOwnedArc;
+
 pub(crate) type Weigher<K, V> = Arc<dyn Fn(&K, &V) -> u32 + Send + Sync + 'static>;
 
 pub(crate) trait AccessTime {
@@ -60,8 +62,9 @@ impl<K> KeyDate<K> {
     }
 }
 
+#[cfg(feature = "typesize")]
 pub(crate) struct KeyHashDate<K> {
-    key: Arc<K>,
+    key: MaybeOwnedArc<K>,
     hash: u64,
     entry_info: TrioArc<EntryInfo<K>>,
 }
