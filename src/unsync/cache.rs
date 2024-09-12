@@ -407,6 +407,30 @@ where
         }
     }
 
+    /// Discards any cached value for the key, returning the cached value.
+    ///
+    /// The key may be any borrowed form of the cache's key type, but `Hash` and `Eq`
+    /// on the borrowed form _must_ match those for the key type.
+    pub fn remove<Q>(&mut self, key: &Q) -> Option<V>
+    where
+        Rc<K>: Borrow<Q>,
+        Q: Hash + Eq + ?Sized,
+    {
+        self.evict_expired_if_needed();
+        self.evict_lru_entries();
+
+        if let Some(mut entry) = self.cache.remove(key) {
+            let weight = entry.policy_weight();
+            self.deques.unlink_ao(&mut entry);
+            crate::unsync::deques::Deques::unlink_wo(&mut self.deques.write_order, &mut entry);
+            self.saturating_sub_from_total_weight(weight as u64);
+            Some(entry.value)
+        }
+        else {
+            None
+        }
+    }
+
     /// Discards all cached values.
     ///
     /// Like the `invalidate` method, this method does not clear the historic
