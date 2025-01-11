@@ -1,10 +1,9 @@
-use crate::common::concurrent::ValueEntry;
+use crate::common::concurrent::{arc::MiniArc, ValueEntry};
 
 use std::{hash::Hash, sync::Arc};
-use triomphe::Arc as TrioArc;
 
 type DashMapRef<'a, K, V> =
-    dashmap::mapref::multiple::RefMulti<'a, Arc<K>, TrioArc<ValueEntry<K, V>>>;
+    dashmap::mapref::multiple::RefMulti<'a, Arc<K>, MiniArc<ValueEntry<K, V>>>;
 
 pub struct EntryRef<'a, K, V>(DashMapRef<'a, K, V>);
 

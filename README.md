@@ -6,7 +6,6 @@
 [![dependency status][deps-rs-badge]][deps-rs]
 <!-- [![coverage status][coveralls-badge]][coveralls] -->
 [![license][license-badge]](#license)
-<!-- [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fmoka-rs%2Fmini-moka.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fmoka-rs%2Fmini-moka?ref=badge_shield) -->
 
 Mini Moka is a fast, concurrent cache library for Rust. Mini Moka is a light edition
 of [Moka][moka-git].
@@ -24,14 +23,12 @@ algorithm to determine which entries to evict when the capacity is exceeded.
 [deps-rs-badge]: https://deps.rs/repo/github/moka-rs/mini-moka/status.svg
 <!-- [coveralls-badge]: https://coveralls.io/repos/github/mini-moka-rs/moka/badge.svg?branch=main -->
 [license-badge]: https://img.shields.io/crates/l/mini-moka.svg
-<!-- [fossa-badge]: https://app.fossa.com/api/projects/git%2Bgithub.com%2Fmoka-rs%2Fmini-moka.svg?type=shield -->
 
 [gh-actions]: https://github.com/moka-rs/mini-moka/actions?query=workflow%3ACI
 [crate]: https://crates.io/crates/mini-moka
 [docs]: https://docs.rs/mini-moka
 [deps-rs]: https://deps.rs/repo/github/moka-rs/mini-moka
 <!-- [coveralls]: https://coveralls.io/github/moka-rs/mini-moka?branch=main -->
-<!-- [fossa]: https://app.fossa.com/projects/git%2Bgithub.com%2Fmoka-rs%2Fmini-moka?ref=badge_shield -->
 
 [moka-git]: https://github.com/moka-rs/moka
 [caffeine-git]: https://github.com/ben-manes/caffeine

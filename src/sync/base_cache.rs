@@ -3,6 +3,7 @@ use crate::{
     common::{
         self,
         concurrent::{
+            arc::MiniArc,
             atomic_time::AtomicInstant,
             constants::{
                 READ_LOG_FLUSH_POINT, READ_LOG_SIZE, WRITE_LOG_FLUSH_POINT, WRITE_LOG_SIZE,
@@ -36,7 +37,6 @@ use std::{
     },
     time::Duration,
 };
-use triomphe::Arc as TrioArc;
 
 pub(crate) struct BaseCache<K, V, S = RandomState> {
     pub(crate) inner: Arc<Inner<K, V, S>>,
@@ -178,7 +178,7 @@ where
                 } else {
                     // Valid entry.
                     let v = arc_entry.value.clone();
-                    let e = TrioArc::clone(arc_entry);
+                    let e = MiniArc::clone(arc_entry);
                     // Drop the entry to avoid to deadlock with record_read_op.
                     std::mem::drop(entry);
                     record(ReadOp::Hit(hash, e, now), now);
@@ -235,7 +235,7 @@ where
 }
 
 impl<K, V, S> BaseCache<K, V, S> {
-    pub(crate) fn is_expired_entry(&self, entry: &TrioArc<ValueEntry<K, V>>) -> bool {
+    pub(crate) fn is_expired_entry(&self, entry: &MiniArc<ValueEntry<K, V>>) -> bool {
         let i = &self.inner;
         let (ttl, tti, va) = (&i.time_to_live(), &i.time_to_idle(), &i.valid_after());
         let now = i.current_time_from_expiration_clock();
@@ -295,7 +295,7 @@ where
                 *entry = self.new_value_entry_from(value.clone(), ts, weight, entry);
                 update_op = Some(WriteOp::Upsert {
                     key_hash: KeyHash::new(Arc::clone(&key), hash),
-                    value_entry: TrioArc::clone(entry),
+                    value_entry: MiniArc::clone(entry),
                     old_weight,
                     new_weight: weight,
                 });
@@ -305,7 +305,7 @@ where
                 let entry = self.new_value_entry(value.clone(), ts, weight);
                 insert_op = Some(WriteOp::Upsert {
                     key_hash: KeyHash::new(Arc::clone(&key), hash),
-                    value_entry: TrioArc::clone(&entry),
+                    value_entry: MiniArc::clone(&entry),
                     old_weight: 0,
                     new_weight: weight,
                 });
@@ -325,9 +325,9 @@ where
         value: V,
         timestamp: Instant,
         policy_weight: u32,
-    ) -> TrioArc<ValueEntry<K, V>> {
-        let info = TrioArc::new(EntryInfo::new(timestamp, policy_weight));
-        TrioArc::new(ValueEntry::new(value, info))
+    ) -> MiniArc<ValueEntry<K, V>> {
+        let info = MiniArc::new(EntryInfo::new(timestamp, policy_weight));
+        MiniArc::new(ValueEntry::new(value, info))
     }
 
     #[inline]
@@ -337,15 +337,15 @@ where
         timestamp: Instant,
         policy_weight: u32,
         other: &ValueEntry<K, V>,
-    ) -> TrioArc<ValueEntry<K, V>> {
-        let info = TrioArc::clone(other.entry_info());
+    ) -> MiniArc<ValueEntry<K, V>> {
+        let info = MiniArc::clone(other.entry_info());
         // To prevent this updated ValueEntry from being evicted by an expiration policy,
         // set the dirty flag to true. It will be reset to false when the write is applied.
         info.set_dirty(true);
         info.set_last_accessed(timestamp);
         info.set_last_modified(timestamp);
         info.set_policy_weight(policy_weight);
-        TrioArc::new(ValueEntry::new(value, info))
+        MiniArc::new(ValueEntry::new(value, info))
     }
 
     #[inline]
@@ -452,9 +452,9 @@ enum AdmissionResult<K> {
     },
 }
 
-type CacheStore<K, V, S> = dashmap::DashMap<Arc<K>, TrioArc<ValueEntry<K, V>>, S>;
+type CacheStore<K, V, S> = dashmap::DashMap<Arc<K>, MiniArc<ValueEntry<K, V>>, S>;
 
-type CacheEntryRef<'a, K, V> = DashMapRef<'a, Arc<K>, TrioArc<ValueEntry<K, V>>>;
+type CacheEntryRef<'a, K, V> = DashMapRef<'a, Arc<K>, MiniArc<ValueEntry<K, V>>>;
 
 pub(crate) struct Inner<K, V, S> {
     max_capacity: Option<u64>,
@@ -816,7 +816,7 @@ where
     fn handle_upsert(
         &self,
         kh: KeyHash<K>,
-        entry: TrioArc<ValueEntry<K, V>>,
+        entry: MiniArc<ValueEntry<K, V>>,
         old_weight: u32,
         new_weight: u32,
         deqs: &mut Deques<K>,
@@ -974,7 +974,7 @@ where
     fn handle_admit(
         &self,
         kh: KeyHash<K>,
-        entry: &TrioArc<ValueEntry<K, V>>,
+        entry: &MiniArc<ValueEntry<K, V>>,
         policy_weight: u32,
         deqs: &mut Deques<K>,
         counters: &mut EvictionCounters,
@@ -994,7 +994,7 @@ where
 
     fn handle_remove(
         deqs: &mut Deques<K>,
-        entry: TrioArc<ValueEntry<K, V>>,
+        entry: MiniArc<ValueEntry<K, V>>,
         counters: &mut EvictionCounters,
     ) {
         if entry.is_admitted() {
@@ -1012,7 +1012,7 @@ where
         ao_deq_name: &str,
         ao_deq: &mut Deque<KeyHashDate<K>>,
         wo_deq: &mut Deque<KeyDate<K>>,
-        entry: TrioArc<ValueEntry<K, V>>,
+        entry: MiniArc<ValueEntry<K, V>>,
         counters: &mut EvictionCounters,
     ) {
         if entry.is_admitted() {

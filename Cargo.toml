@@ -25,10 +25,6 @@ crossbeam-utils = "0.8"
 smallvec = "1.8"
 tagptr = "0.2"
 
-# Opt-out serde and stable_deref_trait features
-# https://github.com/Manishearth/triomphe/pull/5
-triomphe = { version = "0.1.13", default-features = false }
-
 # Optional dependencies (enabled by default)
 dashmap = { version = "6.1", optional = true }
 
@@ -46,11 +42,15 @@ trybuild = "1.0"
 features = []
 rustdoc-args = ["--cfg", "docsrs"]
 
+[target.'cfg(moka_loom)'.dependencies]
+loom = "0.7"
+
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [
-    "cfg(kani)",
-    "cfg(skeptic)",
-    "cfg(circleci)",
-    "cfg(trybuild)",
     "cfg(beta_clippy)",
+    "cfg(circleci)",
+    "cfg(kani)",
+    "cfg(moka_loom)",
+    "cfg(skeptic)",
+    "cfg(trybuild)",
 ] }
