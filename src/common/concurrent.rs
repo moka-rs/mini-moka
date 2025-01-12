@@ -1,9 +1,7 @@
-use crate::common::{deque::DeqNode, time::Instant};
-
 use std::{ptr::NonNull, sync::Arc};
 use tagptr::TagNonNull;
-use triomphe::Arc as TrioArc;
 
+pub(crate) mod arc;
 pub(crate) mod constants;
 pub(crate) mod deques;
 pub(crate) mod entry_info;
@@ -11,7 +9,8 @@ pub(crate) mod housekeeper;
 
 pub(crate) mod atomic_time;
 
-use self::entry_info::EntryInfo;
+use self::{arc::MiniArc, entry_info::EntryInfo};
+use crate::common::{deque::DeqNode, time::Instant};
 
 pub(crate) type Weigher<K, V> = Arc<dyn Fn(&K, &V) -> u32 + Send + Sync + 'static>;
 
@@ -44,14 +43,14 @@ impl<K> Clone for KeyHash<K> {
 
 pub(crate) struct KeyDate<K> {
     key: Arc<K>,
-    entry_info: TrioArc<EntryInfo<K>>,
+    entry_info: MiniArc<EntryInfo<K>>,
 }
 
 impl<K> KeyDate<K> {
-    pub(crate) fn new(key: Arc<K>, entry_info: &TrioArc<EntryInfo<K>>) -> Self {
+    pub(crate) fn new(key: Arc<K>, entry_info: &MiniArc<EntryInfo<K>>) -> Self {
         Self {
             key,
-            entry_info: TrioArc::clone(entry_info),
+            entry_info: MiniArc::clone(entry_info),
         }
     }
 
@@ -63,15 +62,15 @@ impl<K> KeyDate<K> {
 pub(crate) struct KeyHashDate<K> {
     key: Arc<K>,
     hash: u64,
-    entry_info: TrioArc<EntryInfo<K>>,
+    entry_info: MiniArc<EntryInfo<K>>,
 }
 
 impl<K> KeyHashDate<K> {
-    pub(crate) fn new(kh: KeyHash<K>, entry_info: &TrioArc<EntryInfo<K>>) -> Self {
+    pub(crate) fn new(kh: KeyHash<K>, entry_info: &MiniArc<EntryInfo<K>>) -> Self {
         Self {
             key: kh.key,
             hash: kh.hash,
-            entry_info: TrioArc::clone(entry_info),
+            entry_info: MiniArc::clone(entry_info),
         }
     }
 
@@ -90,11 +89,11 @@ impl<K> KeyHashDate<K> {
 
 pub(crate) struct KvEntry<K, V> {
     pub(crate) key: Arc<K>,
-    pub(crate) entry: TrioArc<ValueEntry<K, V>>,
+    pub(crate) entry: MiniArc<ValueEntry<K, V>>,
 }
 
 impl<K, V> KvEntry<K, V> {
-    pub(crate) fn new(key: Arc<K>, entry: TrioArc<ValueEntry<K, V>>) -> Self {
+    pub(crate) fn new(key: Arc<K>, entry: MiniArc<ValueEntry<K, V>>) -> Self {
         Self { key, entry }
     }
 }
@@ -151,18 +150,18 @@ pub(crate) type KeyDeqNodeWo<K> = NonNull<DeqNode<KeyDate<K>>>;
 
 pub(crate) struct ValueEntry<K, V> {
     pub(crate) value: V,
-    info: TrioArc<EntryInfo<K>>,
+    info: MiniArc<EntryInfo<K>>,
 }
 
 impl<K, V> ValueEntry<K, V> {
-    pub(crate) fn new(value: V, entry_info: TrioArc<EntryInfo<K>>) -> Self {
+    pub(crate) fn new(value: V, entry_info: MiniArc<EntryInfo<K>>) -> Self {
         Self {
             value,
             info: entry_info,
         }
     }
 
-    pub(crate) fn entry_info(&self) -> &TrioArc<EntryInfo<K>> {
+    pub(crate) fn entry_info(&self) -> &MiniArc<EntryInfo<K>> {
         &self.info
     }
 
@@ -216,7 +215,7 @@ impl<K, V> ValueEntry<K, V> {
     }
 }
 
-impl<K, V> AccessTime for TrioArc<ValueEntry<K, V>> {
+impl<K, V> AccessTime for MiniArc<ValueEntry<K, V>> {
     #[inline]
     fn last_accessed(&self) -> Option<Instant> {
         self.info.last_accessed()
@@ -240,14 +239,14 @@ impl<K, V> AccessTime for TrioArc<ValueEntry<K, V>> {
 
 pub(crate) enum ReadOp<K, V> {
     // u64 is the hash of the key.
-    Hit(u64, TrioArc<ValueEntry<K, V>>, Instant),
+    Hit(u64, MiniArc<ValueEntry<K, V>>, Instant),
     Miss(u64),
 }
 
 pub(crate) enum WriteOp<K, V> {
     Upsert {
         key_hash: KeyHash<K>,
-        value_entry: TrioArc<ValueEntry<K, V>>,
+        value_entry: MiniArc<ValueEntry<K, V>>,
         old_weight: u32,
         new_weight: u32,
     },

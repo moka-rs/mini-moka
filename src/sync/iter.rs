@@ -1,14 +1,13 @@
 use super::{base_cache::BaseCache, mapref::EntryRef};
-use crate::common::concurrent::ValueEntry;
+use crate::common::concurrent::{arc::MiniArc, ValueEntry};
 
 use std::{
     hash::{BuildHasher, Hash},
     sync::Arc,
 };
-use triomphe::Arc as TrioArc;
 
 pub(crate) type DashMapIter<'a, K, V, S> =
-    dashmap::iter::Iter<'a, Arc<K>, TrioArc<ValueEntry<K, V>>, S>;
+    dashmap::iter::Iter<'a, Arc<K>, MiniArc<ValueEntry<K, V>>, S>;
 
 pub struct Iter<'a, K, V, S> {
     cache: &'a BaseCache<K, V, S>,
