@@ -33,5 +33,18 @@ jobs:
 
       - run: cargo clean
 
-      - name: Run Miri test (deque)
+      - name: Run Miri test on arc module using tree borrows
+        run: cargo miri test arc
+        env:
+          MIRIFLAGS: '-Zmiri-tree-borrows'
+
+      - name: Run Miri test on deque module using tree borrows
+        run: cargo miri test deque
+        env:
+          MIRIFLAGS: '-Zmiri-tree-borrows'
+
+      - name: Run Miri test on arc module using stacked borrows
+        run: cargo miri test arc
+
+      - name: Run Miri test on deque module using stacked borrows
         run: cargo miri test deque
