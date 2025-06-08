@@ -186,10 +186,11 @@ impl<K, V, C> CacheBuilder<K, V, C> {
 #[cfg(test)]
 mod tests {
     use super::CacheBuilder;
-
     use std::time::Duration;
+    use wasm_bindgen_test::wasm_bindgen_test;
 
     #[test]
+    #[wasm_bindgen_test]
     fn build_cache() {
         // Cache<char, String>
         let mut cache = CacheBuilder::new(100).build();
@@ -217,6 +218,7 @@ mod tests {
     }
 
     #[test]
+    #[wasm_bindgen_test]
     #[should_panic(expected = "time_to_live is longer than 1000 years")]
     fn build_cache_too_long_ttl() {
         let thousand_years_secs: u64 = 1000 * 365 * 24 * 3600;
@@ -228,6 +230,7 @@ mod tests {
     }
 
     #[test]
+    #[wasm_bindgen_test]
     #[should_panic(expected = "time_to_idle is longer than 1000 years")]
     fn build_cache_too_long_tti() {
         let thousand_years_secs: u64 = 1000 * 365 * 24 * 3600;
