@@ -219,10 +219,9 @@ where
     }
 }
 
-impl<'a, K, V, S> BaseCache<K, V, S>
+impl<K, V, S> BaseCache<K, V, S>
 where
-    K: 'a + Eq + Hash,
-    V: 'a,
+    K: Eq + Hash,
     S: BuildHasher + Clone,
 {
     pub(crate) fn iter(&self) -> Iter<'_, K, V, S> {
@@ -622,10 +621,9 @@ impl<K, V, S> Inner<K, V, S> {
     }
 }
 
-impl<'a, K, V, S> Inner<K, V, S>
+impl<K, V, S> Inner<K, V, S>
 where
-    K: 'a + Eq + Hash,
-    V: 'a,
+    K: Eq + Hash,
     S: BuildHasher + Clone,
 {
     fn iter(&self) -> DashMapIter<'_, K, V, S> {

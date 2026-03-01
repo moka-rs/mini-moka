@@ -39,18 +39,18 @@ where
     }
 }
 
-unsafe impl<'a, 'i, K, V, S> Send for Iter<'i, K, V, S>
+unsafe impl<'i, K, V, S> Send for Iter<'i, K, V, S>
 where
-    K: 'a + Eq + Hash + Send,
-    V: 'a + Send,
-    S: 'a + BuildHasher + Clone,
+    K: Eq + Hash + Send,
+    V: Send,
+    S: BuildHasher + Clone,
 {
 }
 
-unsafe impl<'a, 'i, K, V, S> Sync for Iter<'i, K, V, S>
+unsafe impl<'i, K, V, S> Sync for Iter<'i, K, V, S>
 where
-    K: 'a + Eq + Hash + Sync,
-    V: 'a + Sync,
-    S: 'a + BuildHasher + Clone,
+    K: Eq + Hash + Sync,
+    V: Sync,
+    S: BuildHasher + Clone,
 {
 }

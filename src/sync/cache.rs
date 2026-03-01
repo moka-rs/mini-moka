@@ -493,10 +493,9 @@ where
     }
 }
 
-impl<'a, K, V, S> Cache<K, V, S>
+impl<K, V, S> Cache<K, V, S>
 where
-    K: 'a + Eq + Hash,
-    V: 'a,
+    K: Eq + Hash,
     S: BuildHasher + Clone,
 {
     /// Creates an iterator visiting all key-value pairs in arbitrary order. The
@@ -790,8 +789,6 @@ mod tests {
         let num_threads = 4;
         let cache = Cache::new(100);
 
-        // https://rust-lang.github.io/rust-clippy/master/index.html#needless_collect
-        #[allow(clippy::needless_collect)]
         let handles = (0..num_threads)
             .map(|id| {
                 let cache = cache.clone();
@@ -1054,8 +1051,6 @@ mod tests {
         let rw_lock = Arc::new(std::sync::RwLock::<()>::default());
         let write_lock = rw_lock.write().unwrap();
 
-        // https://rust-lang.github.io/rust-clippy/master/index.html#needless_collect
-        #[allow(clippy::needless_collect)]
         let handles = (0..NUM_THREADS)
             .map(|n| {
                 let cache = cache.clone();
