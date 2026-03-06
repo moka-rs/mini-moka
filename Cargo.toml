@@ -17,7 +17,8 @@ exclude = [".circleci", ".devcontainer", ".github", ".gitpod.yml", ".vscode"]
 [features]
 default = ["sync"]
 
-sync = ["dashmap"]
+sync = ["dep:dashmap"]
+typesize = ["dep:typesize", "dashmap?/typesize"]
 
 [dependencies]
 crossbeam-channel = "0.5.5"
@@ -31,6 +32,10 @@ triomphe = { version = "0.1.13", default-features = false }
 
 # Optional dependencies (enabled by default)
 dashmap = { version = "6.1", optional = true }
+typesize = { version = "0.1.9", optional = true }
+
+[patch.crates-io.typesize]
+git = "https://github.com/GnomedDev/typesize"
 
 [dev-dependencies]
 anyhow = "1.0.19"

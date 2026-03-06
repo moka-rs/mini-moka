@@ -6,6 +6,7 @@ pub(crate) use clock::Clock;
 
 /// a wrapper type over Instant to force checked additions and prevent
 /// unintentional overflow. The type preserve the Copy semantics for the wrapped
+#[cfg_attr(feature = "typesize", derive(typesize::derive::TypeSize))]
 #[derive(PartialEq, PartialOrd, Clone, Copy)]
 pub(crate) struct Instant(clock::Instant);
 

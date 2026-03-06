@@ -14,6 +14,8 @@
 
 use std::{marker::PhantomData, ptr::NonNull};
 
+use typesize::TypeSize;
+
 use super::CacheRegion;
 
 // `crate::{sync,unsync}::DeqNodes` uses a `tagptr::TagNonNull<DeqNode<T>, 2>`
@@ -326,6 +328,11 @@ impl<T> Deque<T> {
             }
         }
     }
+}
+
+#[cfg(feature = "typesize")]
+impl<T: TypeSize> typesize::TypeSize for Deque<T> {
+    // TODO: Implement extra_size properly
 }
 
 #[cfg(test)]

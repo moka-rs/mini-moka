@@ -2,6 +2,7 @@ use super::Instant;
 
 use std::sync::RwLock;
 
+#[cfg_attr(feature = "typesize", derive(typesize::derive::TypeSize))]
 pub(crate) struct AtomicInstant {
     instant: RwLock<Option<Instant>>,
 }
