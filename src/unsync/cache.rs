@@ -1066,12 +1066,15 @@ fn weigh<K, V>(weigher: &mut Option<Weigher<K, V>>, key: &K, value: &V) -> u32 {
 // To see the debug prints, run test as `cargo test -- --nocapture`
 #[cfg(test)]
 mod tests {
+    use wasm_bindgen_test::wasm_bindgen_test;
+
     use super::Cache;
     use crate::common::time::Clock;
 
     use std::time::Duration;
 
     #[test]
+    #[wasm_bindgen_test]
     fn basic_single_thread() {
         let mut cache = Cache::new(3);
         cache.enable_frequency_sketch_for_testing();
@@ -1122,6 +1125,7 @@ mod tests {
     }
 
     #[test]
+    #[wasm_bindgen_test]
     fn size_aware_eviction() {
         let weigher = |_k: &&str, v: &(&str, u32)| v.1;
 
@@ -1207,6 +1211,7 @@ mod tests {
     }
 
     #[test]
+    #[wasm_bindgen_test]
     fn invalidate_all() {
         let mut cache = Cache::new(100);
         cache.enable_frequency_sketch_for_testing();
@@ -1236,6 +1241,7 @@ mod tests {
     }
 
     #[test]
+    #[wasm_bindgen_test]
     fn invalidate_entries_if() {
         use std::collections::HashSet;
 
@@ -1293,6 +1299,7 @@ mod tests {
     }
 
     #[test]
+    #[wasm_bindgen_test]
     fn time_to_live() {
         let mut cache = Cache::builder()
             .max_capacity(100)
@@ -1346,6 +1353,7 @@ mod tests {
     }
 
     #[test]
+    #[wasm_bindgen_test]
     fn time_to_idle() {
         let mut cache = Cache::builder()
             .max_capacity(100)
@@ -1397,6 +1405,7 @@ mod tests {
 
     #[cfg_attr(target_pointer_width = "16", ignore)]
     #[test]
+    #[wasm_bindgen_test]
     fn test_skt_capacity_will_not_overflow() {
         // power of two
         let pot = |exp| 2u64.pow(exp);
@@ -1442,6 +1451,7 @@ mod tests {
     }
 
     #[test]
+    #[wasm_bindgen_test]
     fn test_debug_format() {
         let mut cache = Cache::new(10);
         cache.insert('a', "alice");
