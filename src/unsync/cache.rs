@@ -951,7 +951,7 @@ where
                 self.deques.unlink_ao(&mut entry);
                 Deques::unlink_wo(&mut self.deques.write_order, &mut entry);
                 evicted_entry_count += 1;
-                evicted_policy_weight = evicted_policy_weight.saturating_sub(weight as u64);
+                evicted_policy_weight = evicted_policy_weight.saturating_add(weight as u64);
             } else {
                 self.deques.write_order.pop_front();
             }
@@ -1439,6 +1439,25 @@ mod tests {
                 ensure_sketch_len(u64::MAX, pot30, "u64::MAX");
             }
         };
+    }
+
+    #[test]
+    fn test_ttl_weight_leak() {
+        let mut cache = Cache::builder()
+            .max_capacity(100)
+            .time_to_live(Duration::from_secs(10))
+            .build();
+
+        let (clock, mock) = Clock::mock();
+        cache.set_expiration_clock(Some(clock));
+
+        cache.insert("a", "alice");
+        assert_eq!(cache.weighted_size(), 1);
+
+        mock.increment(Duration::from_secs(10)); // 10 secs (expired).
+
+        assert_eq!(cache.get(&"a"), None);
+        assert_eq!(cache.weighted_size(), 0);
     }
 
     #[test]
